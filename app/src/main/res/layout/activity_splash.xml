@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/app_background"
+    tools:context=".views.activities.SplashActivity">
+
+    <com.censorchi.utils.NoPaddingTextView
+        android:id="@+id/tv_censor_x"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/robotorondensed_bold"
+        android:gravity="center_horizontal|top"
+        android:letterSpacing="0.1"
+        android:text="@string/censor_x"
+        android:includeFontPadding="false"
+        android:textAllCaps="true"
+        android:textColor="@color/color_orange"
+        android:textSize="@dimen/_36ssp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.censorchi.utils.NoPaddingTextView
+        android:id="@+id/tv_blur_faces_"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/blur_faces_in_pictures_and_videos"
+        android:textSize="@dimen/_11ssp"
+        android:textAllCaps="true"
+        android:paddingStart="@dimen/_5sdp"
+        android:includeFontPadding="false"
+        android:textColor="@android:color/white"
+        android:fontFamily="@font/robotorondensed_bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_censor_x" />
+</androidx.constraintlayout.widget.ConstraintLayout>

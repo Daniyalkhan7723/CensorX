@@ -1,0 +1,55 @@
+<resources>
+    <string name="app_name">Censor X</string>
+    <string name="allow">Allow</string>
+    <string name="don_t_allow">Don\'t allow</string>
+    <string name="please_allow_access_to_your_photos_library_to_pick_pictures_videos"><![CDATA[Please allow access to your Gallery to]]></string>
+    <string name="edit_audio">Edit Audio</string>
+    <string name="censor_it">Censor it</string>
+    <string name="auto_blur_faces">Auto Blur Faces</string>
+    <string name="brush">Brush</string>
+    <string name="censor_video">Censor Video</string>
+    <string name="censor_image">Censor Image</string>
+    <string name="choose">Choose</string>
+    <string name="camera">Camera</string>
+    <string name="gallery">Gallery</string>
+    <string name="cancel">Cancel</string>
+    <string name="censor_x">Censor X</string>
+    <string name="blur_faces_in_pictures_and_videos">Blur Faces in Pictures and Videos</string>
+    <string name="photos_library_access">Gallery Access</string>
+    <string name="censor">Censor</string>
+    <string name="open_image">Open Image / Video</string>
+    <string name="open_video">Open Video</string>
+    <string name="select_media_to_censor">SELECT MEDIA TO CENSOR</string>
+    <string name="add_distortion">Audio Distortion</string>
+    <string name="remove_audio">Remove Audio</string>
+    <string name="audio_removed">Audio Removed</string>
+    <string name="distortion_added">Distortion added</string>
+
+    <string name="foldername">/Blur Images</string>
+    <string name="subfoldername">/temp</string>
+    <string name="message_no_storage_permission_snackbar">Enable Permission From Setting</string>
+    <string name="settings">Setting</string>
+    <string name="get_started">Get Started</string>
+    <string name="pick_pictures_videos"><![CDATA[pick pictures & videos]]></string>
+    <string name="censor_x_blur_faces_nin_picures_and_videos">CENSOR X - BLUR FACES</string>
+    <string name="censor_x_blur_faces_makes_it_fast_and_simple_n_to_anonymize_faces_in_your_photos_and_videos">Censor X - Blur Faces makes it fast and\nsimple to anonymize faces in your photos\n and videos.</string>
+    <string name="none">None</string>
+    <string name="top_blur">Top Blur</string>
+    <string name="bottom_blur">Bottom Blur</string>
+    <string name="full_blur">Full Blur</string>
+    <string name="no_effect">No Effect</string>
+    <string name="processing_image">Processing Image</string>
+    <string name="processing_video">Processing Video</string>
+    <string name="processing_complete">Processing Complete</string>
+    <string name="video_saved">Video Saved</string>
+    <string name="image_saved">Image Saved</string>
+    <string name="image_not_supported">Image not supported</string>
+    <string name="no_face_found">No Face Found</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="please_allow">Please allow access to your photos library to pick pictures and videos that needs to be blurred out</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="_50">50%</string>
+
+
+</resources>

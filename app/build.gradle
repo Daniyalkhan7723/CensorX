@@ -1,0 +1,158 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
+    id("com.google.dagger.hilt.android")
+}
+
+android {
+    namespace 'com.censorchi'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.censorchi"
+        minSdk 23
+        targetSdk 33
+        versionCode 4
+        versionName "1.3"
+        multiDexEnabled true
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        setProperty("archivesBaseName", "Censor X Android" + "-v" + versionCode + "(" + versionName + ")")
+    }
+//    dexOptions {
+//        incremental true
+//        javaMaxHeapSize "4g"
+//    }
+//
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+    }
+
+    buildFeatures {
+        dataBinding true
+        viewBinding true
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    dataBinding {
+        enabled = true
+    }
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'com.google.android.material:material:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    //hilt
+    implementation("com.google.dagger:hilt-android:2.44")
+    kapt("com.google.dagger:hilt-android-compiler:2.44")
+
+    // Activity KTX for viewModels()
+    implementation "androidx.activity:activity-ktx:1.6.1"
+
+    // Architectural Components
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1"
+
+    // Lifecycle
+    implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.5.1"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.5.1"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.5.1"
+
+    // Retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation "com.squareup.okhttp3:okhttp:5.0.0-alpha.2"
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.3'
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
+
+    // Coroutine Lifecycle Scopes
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.5.1"
+
+    //glide
+    implementation 'com.github.bumptech.glide:glide:4.14.2'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.14.2'
+
+    //ssp library
+    implementation 'com.intuit.ssp:ssp-android:1.0.6'
+    //sdp library
+    implementation 'com.intuit.sdp:sdp-android:1.0.6'
+
+    //ML kit
+    implementation 'com.google.mlkit:face-detection:16.1.5'
+
+    // Material dialog dependency
+    implementation 'com.afollestad.material-dialogs:core:3.1.1'
+    implementation 'com.afollestad.material-dialogs:bottomsheets:3.1.1'
+
+    //soundTouch Library
+    implementation project(":soundTouch")
+
+    //videoCompressor
+    implementation project(":compressvideo")
+
+
+    //exoplayer
+//    implementation 'com.google.android.exoplayer:exoplayer:2.18.2'
+    implementation 'com.google.android.exoplayer:exoplayer:2.15.1'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.15.1'
+
+
+    implementation 'cz.msebera.android:httpclient:4.4.1.2'
+
+    //ffmpeg library
+    implementation 'com.arthenica:mobile-ffmpeg-full:4.4.LTS'
+    implementation 'com.arthenica:smart-exception-java:0.2.1'
+//    //light compressor library
+//    implementation 'com.github.AbedElazizShe:LightCompressor:1.2.3'
+
+    //Boom Library
+    implementation 'com.github.astrit-veliu:Boom:1.0'
+
+    //Gson Library
+    implementation 'com.google.code.gson:gson:2.10'
+
+    implementation 'com.github.Dimezis:BlurView:version-2.0.3'
+
+//    implementation 'com.iceteck.silicompressorr:silicompressor:2.2.4'
+//    implementation 'com.googlecode.mp4parser:isoparser:1.1.22'
+
+    implementation "com.github.krazykira:videffects:1.1.1"
+
+    implementation 'com.github.MasayukiSuda:GPUVideo-android:v0.1.2'
+    implementation 'jp.co.cyberagent.android:gpuimage:2.1.0'
+
+
+}
+// Allow references to generated code
+kapt {
+    correctErrorTypes = true
+}

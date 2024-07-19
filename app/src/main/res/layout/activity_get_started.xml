@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/bgImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/get_started_bg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <com.censorchi.utils.NoPaddingTextView
+        android:id="@+id/tvCensorX"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_45sdp"
+        android:fontFamily="@font/robotorondensed_bold"
+        android:gravity="center_horizontal|top"
+        android:includeFontPadding="false"
+        android:letterSpacing="0.1"
+        android:lineSpacingExtra="-5dp"
+        android:text="@string/censor_x"
+        android:textAllCaps="true"
+        android:textColor="#F83F02"
+        android:textSize="@dimen/_36ssp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.censorchi.utils.NoPaddingTextView
+        android:id="@+id/blur_faces_"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:firstBaselineToTopHeight="0dp"
+        android:fontFamily="@font/robotorondensed_bold"
+        android:includeFontPadding="false"
+        android:lineSpacingExtra="0dp"
+        android:paddingStart="@dimen/_5sdp"
+        android:text="@string/blur_faces_in_pictures_and_videos"
+        android:textAllCaps="true"
+        android:textColor="#001253"
+        android:textSize="@dimen/_11ssp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvCensorX" />
+
+
+    <TextView
+        android:id="@+id/tvBlurFaces"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_175sdp"
+        android:fontFamily="@font/roboto_bold"
+        android:text="\tCENSOR X - BLUR FACES \nIN PICTURES AND VIDEOS"
+        android:textColor="#FFFF"
+        android:textSize="@dimen/_20ssp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/blur_faces_" />
+
+    <TextView
+        android:id="@+id/tvDescription"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_5sdp"
+        android:fontFamily="@font/sf_pro_display_regulor"
+        android:lineSpacingExtra="7sp"
+        android:text="@string/censor_x_blur_faces_makes_it_fast_and_simple_n_to_anonymize_faces_in_your_photos_and_videos"
+        android:textAlignment="center"
+        android:textColor="#FFFF"
+        android:textSize="@dimen/_13ssp"
+        android:translationY="-1.55sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvBlurFaces" />
+
+    <!--    <com.google.android.material.button.MaterialButton-->
+    <!--        android:id="@+id/btn_get_started"-->
+    <!--        style="@style/button_style"-->
+    <!--        android:layout_width="match_parent"-->
+    <!--        android:layout_height="@dimen/_50sdp"-->
+    <!--        android:layout_marginStart="@dimen/_30sdp"-->
+    <!--        android:layout_marginEnd="@dimen/_30sdp"-->
+    <!--        android:layout_marginBottom="@dimen/_10sdp"-->
+    <!--        android:backgroundTint="@color/color_orange"-->
+    <!--        android:stateListAnimator="@null"-->
+    <!--        android:text="@string/get_started"-->
+    <!--        app:cornerRadius="@dimen/_4sdp"-->
+    <!--        app:layout_constraintBottom_toBottomOf="@+id/bgImage"-->
+    <!--        app:layout_constraintEnd_toEndOf="parent"-->
+    <!--        app:layout_constraintStart_toStartOf="parent"-->
+    <!--        app:layout_constraintTop_toBottomOf="@+id/tvDescription" />-->
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn_get_started"
+        style="@style/button_style"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/_40sdp"
+        android:layout_marginStart="@dimen/_30sdp"
+        android:layout_marginTop="@dimen/_10sdp"
+        android:layout_marginEnd="@dimen/_30sdp"
+        android:layout_marginBottom="@dimen/_10sdp"
+        android:background="@drawable/ss_corner_round_orange_secondary"
+        android:text="@string/get_started"
+        android:textColor="@android:color/white"
+        app:cornerRadius="@dimen/_4sdp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvDescription" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

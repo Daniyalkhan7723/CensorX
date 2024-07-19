@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.sherazkhilji.videffects.view.VideoSurfaceView
+        android:id="@+id/mVideoSurfaceViewTop"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/_150sdp"
+        android:layout_marginStart="@dimen/_66sdp"
+        android:layout_marginEnd="@dimen/_66sdp"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/viewShown"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.5"
+        android:background="@color/black" />
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center">
+
+        <ImageButton
+            android:id="@id/exo_play"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:background="@drawable/ic_play" />
+
+        <ImageButton
+            android:id="@id/exo_pause"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@drawable/ic_baseline_pause" />
+
+
+    </FrameLayout>
+
+    <RelativeLayout
+        android:id="@+id/audioLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="@dimen/_10sdp"
+        android:layout_marginBottom="@dimen/_10sdp"
+        android:visibility="gone">
+
+
+        <RelativeLayout
+            android:id="@+id/cv_audio_removed"
+            android:layout_width="@dimen/_85sdp"
+            android:layout_height="@dimen/_20sdp"
+            android:layout_marginStart="@dimen/_10sdp"
+            android:layout_marginLeft="@dimen/_10sdp"
+            android:layout_marginEnd="@dimen/_10sdp"
+            android:background="@drawable/iv_frame"
+            android:visibility="gone"
+
+            >
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_centerInParent="true"
+                android:layout_marginStart="@dimen/_10sdp">
+
+                <ImageView
+                    android:id="@+id/iv_audio"
+                    android:layout_width="@dimen/_10sdp"
+                    android:layout_height="@dimen/_10sdp"
+                    android:layout_centerVertical="true"
+                    android:layout_marginLeft="@dimen/_2sdp"
+                    android:src="@drawable/ic_speaker_selected" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="@dimen/_5sdp"
+                    android:layout_toRightOf="@+id/iv_audio"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/audio_removed"
+                    android:textColor="@android:color/white"
+                    android:textSize="@dimen/_6ssp" />
+
+            </RelativeLayout>
+
+        </RelativeLayout>
+
+
+        <RelativeLayout
+            android:id="@+id/cv_distortion"
+            android:layout_width="@dimen/_85sdp"
+            android:layout_height="@dimen/_20sdp"
+            android:layout_marginLeft="@dimen/_5sdp"
+            android:layout_toRightOf="@+id/cv_audio_removed"
+            android:background="@drawable/iv_frame"
+            android:visibility="gone"
+
+            >
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_centerInParent="true"
+                android:layout_marginStart="@dimen/_10sdp"
+
+                >
+
+                <ImageView
+                    android:id="@+id/iv_distortion"
+                    android:layout_width="@dimen/_10sdp"
+                    android:layout_height="@dimen/_10sdp"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/ic_disortion" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="@dimen/_5sdp"
+                    android:layout_toRightOf="@+id/iv_distortion"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/distortion_added"
+                    android:textColor="@android:color/white"
+                    android:textSize="@dimen/_6ssp" />
+
+            </RelativeLayout>
+
+        </RelativeLayout>
+
+    </RelativeLayout>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <!--        <TextView-->
+        <!--            android:id="@id/exo_position"-->
+        <!--            android:layout_width="wrap_content"-->
+        <!--            android:layout_height="wrap_content"-->
+        <!--            android:layout_marginLeft="10dp"-->
+        <!--            android:includeFontPadding="false"-->
+        <!--            android:paddingLeft="4dp"-->
+        <!--            android:paddingRight="4dp"-->
+        <!--            android:textColor="@color/white"-->
+        <!--            android:textSize="14sp"-->
+        <!--            android:textStyle="bold" />-->
+
+
+        <TextView
+            android:id="@+id/duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginRight="10dp"
+            android:includeFontPadding="false"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/endTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginRight="10dp"
+            android:includeFontPadding="false"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+        <!--        <TextView-->
+        <!--            android:id="@id/exo_position"-->
+        <!--            android:layout_width="wrap_content"-->
+        <!--            android:layout_height="wrap_content"-->
+        <!--            android:layout_gravity="end"-->
+        <!--            android:layout_marginRight="10dp"-->
+        <!--            android:includeFontPadding="false"-->
+        <!--            android:paddingLeft="4dp"-->
+        <!--            android:paddingRight="4dp"-->
+        <!--            android:textColor="@color/white"-->
+        <!--            android:textSize="14sp"-->
+        <!--            android:textStyle="bold" />-->
+
+        <!--        <TextView-->
+        <!--            android:id="@id/exo_duration"-->
+        <!--            android:layout_width="wrap_content"-->
+        <!--            android:layout_height="wrap_content"-->
+        <!--            android:layout_gravity="end"-->
+        <!--            android:layout_marginRight="10dp"-->
+        <!--            android:includeFontPadding="false"-->
+        <!--            android:paddingLeft="4dp"-->
+        <!--            android:paddingRight="4dp"-->
+        <!--            android:textColor="@color/white"-->
+        <!--            android:textSize="14sp"-->
+        <!--            android:textStyle="bold" />-->
+
+        <com.google.android.exoplayer2.ui.DefaultTimeBar
+            android:id="@id/exo_progress"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            app:played_color="#E14D2A"
+            app:scrubber_drawable="@drawable/custom_thumb"
+            app:scrubber_enabled_size="24dp"
+            app:unplayed_color="@color/white" />
+
+    </LinearLayout>
+
+</FrameLayout>

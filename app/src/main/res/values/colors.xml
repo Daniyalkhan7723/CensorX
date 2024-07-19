@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#171E30</color>
+    <color name="purple_700">#171E30</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="app_bg_color">#010718</color>
+    <color name="grey_color">#666A74</color>
+    <color name="selected_btn_color">#171E30</color>
+    <color name="un_selected_button">#091022</color>
+    <color name="color_orange">#F83F02</color>
+    <color name="color_orange_secondary">#E14D2A</color>
+    <color name="grey_secondary">#989CA3</color>
+    <color name="transparent_color">#88000000</color>
+    <color name="light_gray_text">#A3A3A3</color>
+    <color name="app_color2">#FAE0C9</color>
+    <color name="colorOnPrimary">#000000</color>
+    <color name="rippleEffect">#60667D</color>
+    <color name="darkBlue">#191E30</color>
+    <color name="app_blue">#0e1f2f</color>
+    <color name="graycolor">#D3D3D3</color>
+
+    <color name="app_color">#EB9751</color>
+    <color name="colorPrimary">#5984E1</color>
+
+
+
+</resources>

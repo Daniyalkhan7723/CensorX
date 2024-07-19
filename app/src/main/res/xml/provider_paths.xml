@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--    <cache-path-->
+    <!--        name="cached_files"-->
+    <!--        path="." />-->
+    <!--    <files-path-->
+    <!--        name="images"-->
+    <!--        path="." />-->
+
+    <!--    <cache-path-->
+    <!--        name="shared_images"-->
+    <!--        path="images/" />-->
+
+    <!--    <external-path-->
+    <!--        name="external_files"-->
+    <!--        path="." />-->
+
+    <cache-path
+        name="cached_files"
+        path="." />
+    <files-path
+        name="images"
+        path="." />
+
+    <cache-path
+        name="shared_images"
+        path="images/" />
+
+    <external-path
+        name="external_files"
+        path="." />
+
+</paths>
+
