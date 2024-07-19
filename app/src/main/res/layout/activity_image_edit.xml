@@ -54,7 +54,9 @@
                 android:layout_marginEnd="@dimen/_10sdp"
                 android:visibility="gone"
                 app:cardBackgroundColor="#191E30"
-                app:shapeAppearanceOverlay="@style/circle">
+                app:shapeAppearanceOverlay="@style/circle"
+
+                >
 
                 <ImageView
                     android:layout_width="@dimen/_15sdp"
@@ -63,6 +65,7 @@
                     android:layout_gravity="center"
                     android:src="@drawable/zoom"
                     app:tint="@color/white" />
+
 
             </com.google.android.material.card.MaterialCardView>
 
@@ -88,45 +91,28 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+        <LinearLayout
+            android:id="@+id/layout_undo_redo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center">
 
-            <LinearLayout
-                android:id="@+id/layout_undo_redo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerHorizontal="true">
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/iv_undo"
+                android:layout_width="@dimen/_25sdp"
+                android:layout_height="@dimen/_20sdp"
+                android:layout_marginRight="@dimen/_8sdp"
+                app:srcCompat="@drawable/ic_undo" />
 
-                <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/iv_undo"
-                    android:layout_width="@dimen/_25sdp"
-                    android:layout_height="@dimen/_20sdp"
-                    android:layout_marginRight="@dimen/_8sdp"
-                    app:srcCompat="@drawable/ic_undo" />
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/iv_redo"
+                android:layout_width="@dimen/_25sdp"
+                android:layout_height="@dimen/_20sdp"
+                android:layout_marginStart="@dimen/_13sdp"
+                app:srcCompat="@drawable/ic_redo" />
 
-                <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/iv_redo"
-                    android:layout_width="@dimen/_25sdp"
-                    android:layout_height="@dimen/_20sdp"
-                    android:layout_marginStart="@dimen/_13sdp"
-                    app:srcCompat="@drawable/ic_redo" />
 
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/btnReset"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentRight="true"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="@dimen/_15sdp"
-                android:fontFamily="@font/sf_pro_display_regulor"
-                android:text="Reset"
-                android:textColor="#E14D2A"
-                android:textSize="@dimen/_13ssp" />
-
-        </RelativeLayout>
+        </LinearLayout>
 
         <RelativeLayout
             android:id="@+id/seek_lay"

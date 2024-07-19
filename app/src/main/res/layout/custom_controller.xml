@@ -4,14 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.sherazkhilji.videffects.view.VideoSurfaceView
-        android:id="@+id/mVideoSurfaceViewTop"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/_150sdp"
-        android:layout_marginStart="@dimen/_66sdp"
-        android:layout_marginEnd="@dimen/_66sdp"
-        android:visibility="gone" />
-
     <View
         android:id="@+id/viewShown"
         android:layout_width="match_parent"

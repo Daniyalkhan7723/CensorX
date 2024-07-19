@@ -7,10 +7,6 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -32,13 +28,12 @@
         tools:targetApi="31">
         <activity
             android:name=".views.activities.MainActivity"
-            android:configChanges="screenLayout|screenSize|orientation"
             android:exported="true">
 
-            <!--            <intent-filter>-->
-            <!--                <action android:name="android.intent.action.MAIN" />-->
-            <!--                <category android:name="android.intent.category.LAUNCHER" />-->
-            <!--            </intent-filter>-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN" />-->
+<!--                <category android:name="android.intent.category.LAUNCHER" />-->
+<!--            </intent-filter>-->
 
             <meta-data
                 android:name="android.app.lib_name"
@@ -56,7 +51,6 @@
         <activity
             android:name=".views.activities.VideoEditActivity"
             android:screenOrientation="portrait" />
-
 
         <activity
             android:name=".views.activities.AllowAccessActivity"
@@ -92,8 +86,7 @@
         </activity>
         <activity
             android:name=".views.activities.GetStartedActivity"
-            android:exported="true"
-            android:screenOrientation="portrait" />
+            android:exported="true" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

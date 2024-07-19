@@ -10,13 +10,11 @@ object Constants {
     const val SHARED_PREFERENCE_TOP = "shared preferences Top"
     const val SHARED_PREFERENCE_BOTTOM = "shared preferences Bottom"
     const val SHARED_PREFERENCE_FULL = "shared preferences Full"
-    const val SHARED_PREFERENCE_BOOLEAN = "shared preferences Boolean"
     const val IMAGE_DIRECTORY = "/CensorX_qImages"
     const val SCALING_FACTOR = 3
     const val GET_STARTED = "getStarted"
     const val IS_BACK = "isBack"
     const val TOP_BLUR = "topBlur"
-    const val RequestPermissionCode_write = 1
     const val BOTTOM_BLUR = "bottomBlur"
     const val FULL_BLUR = "fullBlur"
     const val TAG = "FACE_DETECT_TAG"
@@ -34,10 +32,7 @@ object Constants {
     //Min video You want to buffer when user resumes video
     const val MIN_PLAYBACK_RESUME_BUFFER = 2000
 
-    const val Full_VIDEO_PATH = "_FULLVIDEO"
-    const val CENSORX_TOP_BLUR = "_CROPTOP"
-    const val CROP_BOTTOM_BLUR= "CROPBOTTOM_"
-    const val CROP_BOTTOM_BLUR_TWO= "CROPBOTTOMTWO_"
+    const val CENSORX_TOP_BLUR = "_CENSORX"
     const val CENSORX_BOTTOM_BLUR= "CENSORX_"
     const val CENSORX_FULL_BLUR = "_CENSORX_"
     const val IMAGE_PATH = "imagePath"
@@ -59,7 +54,7 @@ object Constants {
         return 0
     }
 
-    fun formatSeconds(timeInSeconds: Long): String {
+    fun formatSeconds(timeInSeconds: Long): String? {
         val hours = timeInSeconds / 3600
         val secondsLeft = timeInSeconds - hours * 3600
         val minutes = secondsLeft / 60
@@ -75,5 +70,6 @@ object Constants {
         formattedTime += seconds
         return formattedTime
     }
+
 
 }

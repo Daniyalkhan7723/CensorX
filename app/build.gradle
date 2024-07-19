@@ -13,17 +13,15 @@ android {
         applicationId "com.censorchi"
         minSdk 23
         targetSdk 33
-        versionCode 4
-        versionName "1.3"
+        versionCode 1
+        versionName "1.0"
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        setProperty("archivesBaseName", "Censor X Android" + "-v" + versionCode + "(" + versionName + ")")
     }
-//    dexOptions {
-//        incremental true
-//        javaMaxHeapSize "4g"
-//    }
-//
+    dexOptions {
+        incremental true
+        javaMaxHeapSize "4g"
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -65,8 +63,8 @@ dependencies {
     implementation 'com.google.android.material:material:1.7.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.0'
 
     //hilt
     implementation("com.google.dagger:hilt-android:2.44")
@@ -88,7 +86,7 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation "com.squareup.okhttp3:okhttp:5.0.0-alpha.2"
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.3'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.0'
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
@@ -106,7 +104,7 @@ dependencies {
     //sdp library
     implementation 'com.intuit.sdp:sdp-android:1.0.6'
 
-    //ML kit
+    //mlkit
     implementation 'com.google.mlkit:face-detection:16.1.5'
 
     // Material dialog dependency
@@ -117,38 +115,27 @@ dependencies {
     implementation project(":soundTouch")
 
     //videoCompressor
-    implementation project(":compressvideo")
+//    implementation project(":videocompressor")
 
 
     //exoplayer
-//    implementation 'com.google.android.exoplayer:exoplayer:2.18.2'
-    implementation 'com.google.android.exoplayer:exoplayer:2.15.1'
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.15.1'
-
-
+    implementation 'com.google.android.exoplayer:exoplayer:2.17.1'
     implementation 'cz.msebera.android:httpclient:4.4.1.2'
 
     //ffmpeg library
     implementation 'com.arthenica:mobile-ffmpeg-full:4.4.LTS'
-    implementation 'com.arthenica:smart-exception-java:0.2.1'
-//    //light compressor library
-//    implementation 'com.github.AbedElazizShe:LightCompressor:1.2.3'
+    implementation 'com.arthenica:smart-exception-java:0.1.0'
+    //light compressor library
+    implementation 'com.github.AbedElazizShe:LightCompressor:1.2.3'
 
     //Boom Library
-    implementation 'com.github.astrit-veliu:Boom:1.0'
+    implementation 'com.github.astrit-veliu:Boom:v1.1'
 
     //Gson Library
     implementation 'com.google.code.gson:gson:2.10'
 
-    implementation 'com.github.Dimezis:BlurView:version-2.0.3'
-
 //    implementation 'com.iceteck.silicompressorr:silicompressor:2.2.4'
 //    implementation 'com.googlecode.mp4parser:isoparser:1.1.22'
-
-    implementation "com.github.krazykira:videffects:1.1.1"
-
-    implementation 'com.github.MasayukiSuda:GPUVideo-android:v0.1.2'
-    implementation 'jp.co.cyberagent.android:gpuimage:2.1.0'
 
 
 }

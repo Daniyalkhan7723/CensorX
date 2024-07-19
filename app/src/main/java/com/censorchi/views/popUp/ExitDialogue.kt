@@ -9,7 +9,6 @@ import androidx.fragment.app.DialogFragment
 import com.censorchi.R
 import com.censorchi.databinding.ExitDialogueBinding
 import com.censorchi.utils.applyBoomEffect
-import com.censorchi.utils.viewGone
 
 class ExitDialogue(
     private var goToLoginListener: GoToHome, var type: String
@@ -36,6 +35,7 @@ class ExitDialogue(
         val view = layoutInflater.inflate(R.layout.exit_dialogue, container, false)
         binding = ExitDialogueBinding.bind(view)
 
+
         if (type == "permission") {
             binding.tvTitle.text = "Permission Required"
             binding.tvDes.text =
@@ -43,25 +43,11 @@ class ExitDialogue(
             binding.btnYes.text = "Open Settings"
             binding.btnNo.text = "Cancel"
         }
-        else if (type == "noSound"){
-            binding.btnNo.viewGone()
-            binding.tvTitle.text = "Alert"
-            binding.tvDes.text ="Video has no sound"
-            binding.btnYes.text = "Ok"
-
-        }
-        else if (type == "reset") {
-            binding.tvTitle.text = "Confirmation"
-            binding.tvDes.text =
-                "Are you sure you want to reset all the edits?\n Reset cannot be undone "
-            binding.btnYes.text = "RESET"
-            binding.btnNo.text = "CANCEL"
-        }
-        binding.btnYes.applyBoomEffect()
+        binding.btnYes.applyBoomEffect(true)
         binding.btnYes.setOnClickListener {
             goToLoginListener.onGoToHomeOk()
         }
-        binding.btnNo.applyBoomEffect()
+        binding.btnNo.applyBoomEffect(true)
         binding.btnNo.setOnClickListener {
             goToLoginListener.onGoToHomeCancel()
         }

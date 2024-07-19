@@ -2,148 +2,127 @@ package com.censorchi.views.activities
 
 import android.app.Dialog
 import android.content.ContentValues
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.drawable.ColorDrawable
 import android.media.MediaMetadataRetriever
-import android.media.MediaPlayer
 import android.net.Uri
-import android.os.*
+import android.os.Build
+import android.os.Bundle
+import android.os.Environment
+import android.os.Handler
 import android.util.AndroidRuntimeException
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.abedelazizshe.lightcompressorlibrary.CompressionListener
+import com.abedelazizshe.lightcompressorlibrary.VideoCompressor
+import com.abedelazizshe.lightcompressorlibrary.VideoQuality
+import com.abedelazizshe.lightcompressorlibrary.config.AppSpecificStorageConfiguration
+import com.abedelazizshe.lightcompressorlibrary.config.Configuration
+import com.abedelazizshe.lightcompressorlibrary.config.SaveLocation
+import com.abedelazizshe.lightcompressorlibrary.config.SharedStorageConfiguration
 import com.arthenica.mobileffmpeg.Config
 import com.arthenica.mobileffmpeg.FFmpeg
 import com.arthenica.mobileffmpeg.Statistics
 import com.censorchi.R
 import com.censorchi.databinding.ActivityEditVideoBinding
 import com.censorchi.utils.*
+import com.censorchi.utils.sharedPreference.AppStorage.clearSessionTopBlur
+import com.censorchi.utils.sharedPreference.AppStorage.clearSessionBottomBlur
+import com.censorchi.utils.sharedPreference.AppStorage.clearSessionFullBlur
+import com.censorchi.utils.sharedPreference.AppStorage.getBottomBlur
+import com.censorchi.utils.sharedPreference.AppStorage.getFullBlur
+import com.censorchi.utils.sharedPreference.AppStorage.getTopBlur
+import com.censorchi.utils.sharedPreference.AppStorage.setBottomBlurPref
+import com.censorchi.utils.sharedPreference.AppStorage.setFullBlurPref
+import com.censorchi.utils.sharedPreference.AppStorage.setTopBlur
 import com.censorchi.utils.Constants.CENSORX_BOTTOM_BLUR
 import com.censorchi.utils.Constants.CENSORX_FULL_BLUR
 import com.censorchi.utils.Constants.CENSORX_TOP_BLUR
-import com.censorchi.utils.Constants.CROP_BOTTOM_BLUR
-import com.censorchi.utils.Constants.CROP_BOTTOM_BLUR_TWO
-import com.censorchi.utils.Constants.Full_VIDEO_PATH
+import com.censorchi.utils.Constants.MAX_BUFFER_DURATION
+import com.censorchi.utils.Constants.MIN_BUFFER_DURATION
+import com.censorchi.utils.Constants.MIN_PLAYBACK_RESUME_BUFFER
+import com.censorchi.utils.Constants.MIN_PLAYBACK_START_BUFFER
 import com.censorchi.utils.Constants.VIDEO_PATH
-import com.censorchi.utils.sharedPreference.AppStorage
 import com.censorchi.views.popUp.DialogueForShowVideoProgress
 import com.censorchi.views.popUp.ExitDialogue
+import com.censorchi.views.popUp.MaterialDialogHelper
 import com.google.android.exoplayer2.*
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
+import com.google.android.exoplayer2.trackselection.TrackSelector
 import com.google.android.exoplayer2.upstream.*
-import com.iamkdblue.videocompressor.VideoCompress
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import net.surina.soundtouch.SoundTouch
 import java.io.*
+import java.lang.System.err
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.collections.ArrayList
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChangeListener,
-    View.OnClickListener, MediaPlayer.OnCompletionListener {
+    View.OnClickListener {
     /*Binding*/
     private lateinit var binding: ActivityEditVideoBinding
 
-    /* Views & Objects */
+    /*Views*/
     private lateinit var fileUri: Uri
     private lateinit var audioChangeLayout: RelativeLayout
-    private lateinit var audioChangeLayoutForLandScape: RelativeLayout
     private lateinit var audioDistortion: RelativeLayout
-    private lateinit var audioDistortionForLandScape: RelativeLayout
     private lateinit var audioRemove: RelativeLayout
-    private lateinit var audioRemoveForLandScape: RelativeLayout
     private lateinit var duration: TextView
-    private lateinit var durationLandScape: TextView
     private lateinit var totalTime: TextView
-    private lateinit var totalTimeForLandScape: TextView
-    private lateinit var dialog: Dialog
     private lateinit var popUpForCompressedVideo: DialogueForShowVideoProgress
-    private lateinit var exitPopup: ExitDialogue
-    private var handler: Handler? = null
-    private var progressbar: ProgressBar? = null
-    private var textView: TextView? = null
-    private var mediaPlayerTop: MediaPlayer? = null
-    private var mediaPlayerBottom: MediaPlayer? = null
-    private var mediaPlayerFull: MediaPlayer? = null
-    private var listForLastFifty = ArrayList<String>()
-    private var listForFirstFifty = ArrayList<String>()
+    private var exoPlayer: ExoPlayer? = null
+    lateinit var exitPopup: ExitDialogue
 
     /* Files */
     private var file1: File? = null
     private var file2: File? = null
-    private var compressedFile: File? = null
     private var file3: File? = null
     private var folder: File? = null
     private var fileForMute: File? = null
     private var extractAudioFile: File? = null
-    private var fullVideoFile: File? = null
-    private var topBlurFinalOutputFile: File? = null
+    private var topBlurOutputFile: File? = null
     private var bottomBlurOutputFile: File? = null
-    private var bottomBlurOutputFileTwo: File? = null
-    private var bottomBlurFinalOutputFile: File? = null
     private var fullBlurOutputFile: File? = null
 
-    var downloadFile: File? = null
-    var downloadFile2: File? = null
-    var compresseddFile: File? = null
-    var downloadFile3: File? = null
-    var fullVideoForCropFile: File? = null
-    var topBlurFinalDownload: File? = null
-    var bottomBlurDownload: File? = null
-    var bottomBlurDownloadTwo: File? = null
-    var bottomBlurFinalDownload: File? = null
-    var fullBlurDownload: File? = null
-
-    /* Strings */
+    /*Strings*/
     private var video: String? = null
+    private lateinit var outputForBlurredVideo: String
     private lateinit var outPutForMutedBlurredVideo: String
     private lateinit var secondOutputForBlur: String
+    private lateinit var newVideo: String
     private lateinit var lessResolatedFile: String
-    private lateinit var compressFile: String
     private lateinit var finalOutput: String
-    private lateinit var fullOutPut: String
-    private lateinit var topBlurFinalOutput: String
+    private lateinit var topBlurOutput: String
     private lateinit var bottomBlurOutput: String
-    private lateinit var bottomBlurOutputTwo: String
-    private lateinit var bottomBlurFinalOutput: String
     private lateinit var fullBlurOutput: String
     private var finalVideo: String = ""
     private var mutedVideo: String = ""
-    private var finalMuteVideo: String = ""
+    private var blurAndMuteVideo: String = ""
     private var originalPath: String? = null
-    private var distortedVideo: String = ""
     private var finalDistortedVideo: String = ""
 
     /*Integers*/
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
-    private var seekbarRadius = 25
-    private var seekBarForSaveVideo = 50
-    private var higth = 5
-    private var weigth = 5
-    private var mVideoWidth = 0
-    private var mVideoHeight = 0
-    private var values = 0
-    private var videoPosition = 0
-    private var counter: Int = 0
-    private var counter2: Int = 0
-    private var scaledWidth = 0f
-    private var scaledHeight = 0f
+    private var mradius: Int = 0
+    var topSeekBar = 0
+    var bottomSeekBar = 0
+    var fullSeekBar = 0
 
     /*Longs*/
     private var totalDuration: Long = 0
     private var lastMaxValue: Long = 0
     private var progressId: Long = 0
+    private var playbackPosition = 0L
 
     /*Floats*/
     private var dur: Float = 0F
@@ -152,947 +131,952 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
     private var mHandler: Handler? = null
 
     /*Booleans*/
+    private var playWhenReady = true
     private var isBlurred = false
     private var isDistortion = false
     private var isCompression = false
     private var isMuted = false
-    private var topBlur = false
-    private var nonBlur = false
-    private var bottomBlur = false
-    private var fullBlur = false
-    private var checkVisibility = false
-    private var isShowBackDialogue = false
-    private var isLandScapeMode = false
-    private var isLargeSizeVideo = false
-    private var isHundredValue = false
-    private var processComplete = false
-    private var isInitialBlurValue = false
-    private var isInitialBlurValueDistortion = false
+    private var isNoEffect = false
+    private var blurAndMuted = false
+    var mTopBlur = false
+    var mBottomBlur = false
+    var mFullBlur = false
+    var isBlurAndMuted = false
+
+    companion object {
+        var topBlur: Boolean = false
+        var nonBlur: Boolean = false
+        var bottomBlur: Boolean = false
+        var fullBlur: Boolean = false
+    }
 
     private val updateProgressAction = Runnable {
         updateProgress()
     }
 
-    private val updateProgressActionForLandScape = Runnable {
-        updateProgressForLandScape()
-    }
-
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityEditVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        disableShareAndSave()
-        binding.exoPause.viewVisible()
-        handler = Handler(Looper.getMainLooper())
+        binding.homeToolbarId.toolbarNameTv.text = getString(R.string.censor_video)
         popUpForCompressedVideo = DialogueForShowVideoProgress()
         createFilesAndDirectories()
+
         video = intent.getStringExtra(VIDEO_PATH)
         fileUri = Uri.parse(video)
         originalPath = this.getRealPathFromUri(applicationContext, Uri.parse(video))
-
         uris.add(fileUri)
         getHeight(originalPath!!)
-        getTotalDuration(originalPath!!)
-        checkOrientationOfVideo()
+        executeResolutionDown()
 
-        val handler = Handler(Looper.getMainLooper())
-        handler.postDelayed({
-            if (isLandScapeMode) {
-                binding.relForGetValues.viewVisible()
-                binding.layoutBlue.viewVisible()
-                processComplete = true
-                binding.apply {
-                    videoView1.apply {
-                        setVideoPath(originalPath!!)
-                        start()
-                        setOnPreparedListener {
-                            it.setVolume(0F, 0F)
-                            var mwidth = it.videoWidth
-                            var mheight = it.videoHeight
+//        getHeight(originalPath!!)
+//        if (videoWidth > 600) {
+//            isCompression = true
+//            executeResolutionDownn()
+//        }
+        disableShareAndSave()
 
-                            var dpWidthView = width
-                            var dpHeightView = height
+        audioChangeLayout = binding.playerView.findViewById(R.id.audioLayout)
+        audioDistortion = binding.playerView.findViewById(R.id.cv_distortion)
+        audioRemove = binding.playerView.findViewById(R.id.cv_audio_removed)
+        duration = binding.playerView.findViewById(R.id.duration)
+        totalTime = binding.playerView.findViewById(R.id.endTime)
 
-                            val xScale = dpWidthView.toFloat() / mwidth
-                            val yScale = dpHeightView.toFloat() / mheight
-                            val scale = xScale.coerceAtMost(yScale)
-
-                            scaledWidth = scale * videoWidth
-                            scaledHeight = scale * videoHeight
-                        }
-
-                    }
-                }
-                if (videoHeight == videoWidth) {
-                    processComplete = false
-                    compressVideo()
-                    resizeVideo("compress")
-                    isLargeSizeVideo = true
-                } else {
-                    compressVideo()
-                    resizeVideo("compress")
-                    isLargeSizeVideo = true
-                }
-
+        if (finalVideo.isNotEmpty()) {
+            preparePlayer(Uri.parse(finalVideo))
+            var videoWatchedTime: Long = 0
+            Handler().postDelayed({ //Do your work
+                videoWatchedTime = exoPlayer!!.currentPosition / 1000
+            }, 1000)
+            duration.text = videoWatchedTime.toString()
+        } else {
+            if (isCompression) {
+                binding.playerView.viewGone()
             } else {
-                if (videoWidth != 1920) {
-                    binding.relForGetValues.viewVisible()
-                    binding.layoutBlue.viewVisible()
-                    processComplete = true
-                    binding.apply {
-                        videoView1.apply {
-                            setVideoPath(originalPath!!)
-                            start()
-                            setOnPreparedListener {
-                                it.setVolume(0F, 0F)
-                                var mwidth = it.videoWidth
-                                var mheight = it.videoHeight
-
-                                var dpWidthView = width
-                                var dpHeightView = height
-
-                                val xScale = dpWidthView.toFloat() / mwidth
-                                val yScale = dpHeightView.toFloat() / mheight
-                                val scale = xScale.coerceAtMost(yScale)
-
-                                scaledWidth = scale * videoWidth
-                                scaledHeight = scale * videoHeight
-                            }
-
-                        }
-
-                    }
-                }
-
-                if (videoHeight > 1080) {
-                    isLargeSizeVideo = false
-                    isCompression = true
-                    setProgressDialogue("process")
-                    videoCutForFullVideoCommand(
-                        getRealPathFromUri(applicationContext, Uri.parse(video))!!,
-                        fullOutPut,
-                        "noCompress"
-                    )
-
-                    videoCutForTopCommand(originalPath!!, bottomBlurOutput, "noCompress")
-                    videoCutForBottomCommand(originalPath!!, bottomBlurOutputTwo, "noCompress")
-                } else if (videoWidth > 1000 || videoHeight >= 900) {
-                    if (!isLandScapeMode) {
-                        val params =
-                            binding.mVideoSurfaceViewNone.layoutParams as RelativeLayout.LayoutParams
-                        params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
-                        params.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
-                        params.addRule(RelativeLayout.ALIGN_PARENT_TOP)
-                        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
-                        binding.mVideoSurfaceViewNone.layoutParams = params //causes layout update
-
-                    }
-                    compressVideo()
-                    resizeVideo("compress")
-                    isLargeSizeVideo = true
-                } else {
-                    isLargeSizeVideo = false
-                    isCompression = true
-                    setProgressDialogue("process")
-                    videoCutForFullVideoCommand(
-                        getRealPathFromUri(applicationContext, Uri.parse(video))!!,
-                        fullOutPut,
-                        "noCompress"
-                    )
-                    videoCutForTopCommand(originalPath!!, bottomBlurOutput, "noCompress")
-                    videoCutForBottomCommand(originalPath!!, bottomBlurOutputTwo, "noCompress")
-                }
+                binding.playerView.viewVisible()
+                preparePlayer(Uri.parse(originalPath))
+                mHandler = Handler()
+                mHandler?.post(updateProgressAction)
+                updateProgress()
+                exoPlayer?.addListener(videoPlayerListener)
             }
-        }, 500)
-
-        binding.homeToolbarId.toolbarNameTv.text = getString(R.string.censor_video)
-        audioChangeLayout = binding.audioChangeLayout
-        audioChangeLayoutForLandScape = binding.audioChangeLayoutForLanScape
-        audioDistortion = binding.cvDistortion
-        audioDistortionForLandScape = binding.cvDistortionForLanScape
-        audioRemove = binding.cvAudioRemoved
-        audioRemoveForLandScape = binding.cvAudioRemovedForLanScape
-        duration = binding.duration
-        durationLandScape = binding.durationForLandScape
-        totalTime = binding.endTime
-        totalTimeForLandScape = binding.endTimeForLandScape
-
+        }
         listeners()
         setBottomLayout()
         setNonBlur()
         getTotalDuration(originalPath!!)
+
     }
 
-    private fun setVideoView(path: String) {
-        binding.apply {
-            mVideoSurfaceViewNone.apply {
-                setVideoPath(path)
-                start()
-                setBlurs()
-                setOnPreparedListener {
-                    seekbar.max = mVideoSurfaceViewNone.duration
-                    setPlayerSeekBar()
-                    if (!isBlurred) {
-                        mVideoSurfaceViewTop.viewGone()
-                        mVideoSurfaceViewBottom.viewGone()
-                        mVideoSurfaceViewFull.viewGone()
-                    }
-                }
-                setOnCompletionListener {
-                    exoPause.viewGone()
-                    exoPlay.viewVisible()
-                }
-            }
+    /* That function is creating files and folders */
+    private fun createFilesAndDirectories() {
+        file1 =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+
+        file2 =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+
+        file3 =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+
+        topBlurOutputFile =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+        bottomBlurOutputFile =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+        fullBlurOutputFile =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+
+        if (!file1!!.exists()) {
+            file1!!.mkdirs()
         }
-    }
 
-    private fun setVideoViewLandScape(path: String, type: String) {
-        val layoutParams: ViewGroup.LayoutParams = binding.relLayoutLandScape.layoutParams
-        layoutParams.width = scaledWidth.toInt()
-        layoutParams.height = scaledHeight.toInt()
-        binding.relLayoutLandScape.layoutParams = layoutParams
-
-        binding.apply {
-            mVideoSurfaceViewNoneLandScape.apply {
-                setVideoPath(path)
-                val metrics = DisplayMetrics()
-                windowManager.defaultDisplay.getMetrics(metrics)
-                mVideoSurfaceViewNoneLandScape.layoutParams =
-                    RelativeLayout.LayoutParams(metrics.widthPixels, metrics.heightPixels)
-                start()
-                setBlursForLandScape()
-                setOnPreparedListener {
-                    seekbar.max = mVideoSurfaceViewNoneLandScape.duration
-                    setPlayerSeekBarForLandScape()
-                    if (!isBlurred) {
-                        mVideoSurfaceViewTopForLandScape.viewGone()
-                        mVideoSurfaceViewBottomForLandScape.viewGone()
-                        mVideoSurfaceViewFullForLandScape.viewGone()
-                    }
-                }
-                setOnCompletionListener {
-                    videoPauseBtnLandScape.viewGone()
-                    videoPlayBtnLandScape.viewVisible()
-                }
-            }
+        if (!file2!!.exists()) {
+            file2!!.mkdirs()
         }
+
+        if (!file3!!.exists()) {
+            file3!!.mkdirs()
+        }
+
+        if (!topBlurOutputFile!!.exists()) {
+            topBlurOutputFile!!.mkdirs()
+        }
+
+        if (!bottomBlurOutputFile!!.exists()) {
+            bottomBlurOutputFile!!.mkdirs()
+        }
+
+        if (!fullBlurOutputFile!!.exists()) {
+            fullBlurOutputFile!!.mkdirs()
+        }
+
+        val downloadFile = File(file1, generateBlurName() + ".mp4")
+        val downloadFile2 = File(file2, "VIDEO_" + System.currentTimeMillis() + ".mp4")
+        val downloadFile3 = File(file3, "VIDEO2_" + System.currentTimeMillis() + ".mp4")
+
+        val topBlurDownload =
+            File(topBlurOutputFile, CENSORX_TOP_BLUR + System.currentTimeMillis() + ".mp4")
+        val bottomBlurDownload =
+            File(bottomBlurOutputFile, CENSORX_BOTTOM_BLUR + System.currentTimeMillis() + ".mp4")
+        val fullBlurDownload =
+            File(fullBlurOutputFile, CENSORX_FULL_BLUR + System.currentTimeMillis() + ".mp4")
+
+        topBlurOutput = topBlurDownload.absolutePath
+        bottomBlurOutput = bottomBlurDownload.absolutePath
+        fullBlurOutput = fullBlurDownload.absolutePath
+        outPutForMutedBlurredVideo = downloadFile.absolutePath
+        secondOutputForBlur = downloadFile3.absolutePath
+        lessResolatedFile = downloadFile2.absolutePath
     }
 
+    override fun onPause() {
+        super.onPause()
+        exoPlayer?.release()
+        mHandler?.removeCallbacks(updateProgressAction)
+    }
 
-    private fun resetPlayer() {
-        if (isLandScapeMode) {
-            binding.apply {
-                if (topBlur) {
-                    setVideoWhenTopBlur()
-                } else if (bottomBlur) {
-                    setVideoWhenBottomBlur()
-                } else if (fullBlur) {
-                    setVideoWhenFullBlur()
-                }
-                setPlayerSeekBarForLandScape()
-                videoPauseBtnLandScape.viewVisible()
-                videoPlayBtnLandScape.viewGone()
-            }
+    override fun onResume() {
+        super.onResume()
+        if (finalVideo.isNotEmpty()) {
+            preparePlayer(Uri.parse(finalVideo))
+            mHandler = Handler()
+            mHandler?.post(updateProgressAction)
+            updateProgress()
+            exoPlayer?.addListener(videoPlayerListener)
         } else {
-            if (processComplete) {
-                val layoutParams: ViewGroup.LayoutParams = binding.relBlurViews.layoutParams
-                layoutParams.width = scaledWidth.toInt()
-                layoutParams.height = scaledHeight.toInt()
-                binding.relBlurViews.layoutParams = layoutParams
-
-                val params = RelativeLayout.LayoutParams(
-                    RelativeLayout.LayoutParams.MATCH_PARENT,
-                    RelativeLayout.LayoutParams.MATCH_PARENT
-                )
-                if (topBlur) {
-                    binding.mVideoSurfaceViewTop.layoutParams = params
-                } else if (bottomBlur) {
-                    binding.mVideoSurfaceViewBottom.layoutParams = params
-                } else {
-                    binding.mVideoSurfaceViewFull.layoutParams = params
-                }
-            }
-
-            binding.apply {
-                if (topBlur) {
-                    setVideoWhenTopBlur()
-                } else if (bottomBlur) {
-                    setVideoWhenBottomBlur()
-                } else if (fullBlur) {
-                    setVideoWhenFullBlur()
-                }
-                setPlayerSeekBar()
-                exoPause.viewVisible()
-                exoPlay.viewGone()
-            }
-        }
-
-    }
-
-
-    private fun resetPlayerForMute(path: String) {
-        binding.apply {
-            if (isLandScapeMode) {
-                lifecycleScope.launch {
-                    mVideoSurfaceViewNoneLandScape.apply {
-                        stopPlayback()
-                        setVideoPath(path)
-                        start()
-                    }
-                }
-                videoPauseBtnLandScape.viewVisible()
-                videoPlayBtnLandScape.viewGone()
-                if (topBlur) {
-                    setVideoWhenTopBlur()
-                } else if (bottomBlur) {
-                    setVideoWhenBottomBlur()
-                } else if (fullBlur) {
-                    setVideoWhenFullBlur()
-                }
-                setPlayerSeekBarForLandScape()
+            if (isCompression) {
+                binding.playerView.viewGone()
             } else {
-                lifecycleScope.launch {
-                    mVideoSurfaceViewNone.apply {
-                        stopPlayback()
-                        setVideoPath(path)
-                        start()
-                    }
-                }
-                exoPause.viewVisible()
-                exoPlay.viewGone()
-                if (topBlur) {
-                    setVideoWhenTopBlur()
-                } else if (bottomBlur) {
-                    setVideoWhenBottomBlur()
-                } else if (fullBlur) {
-                    setVideoWhenFullBlur()
-                }
-                setPlayerSeekBar()
+                preparePlayer(Uri.parse(originalPath))
+                mHandler = Handler()
+                mHandler?.post(updateProgressAction)
+                updateProgress()
+                exoPlayer?.addListener(videoPlayerListener)
             }
-
-
-        }
-    }
-
-    private fun setVideoWhenTopBlur() {
-        binding.apply {
-            if (isLandScapeMode) {
-                mVideoSurfaceViewNoneLandScape.seekTo(0)
-                mVideoSurfaceViewNoneLandScape.start()
-                mediaPlayerTop?.seekTo(0)
-                mediaPlayerTop?.start()
-
-                mVideoWidth = videoWidth
-                mVideoHeight = videoHeight
-                mVideoWidth /= weigth
-                mVideoHeight /= higth
-                val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                mVideoSurfaceViewTopForLandScape.filter = filter
-
-                mVideoSurfaceViewBottomForLandScape.viewGone()
-                mVideoSurfaceViewTopForLandScape.viewVisible()
-                mVideoSurfaceViewFullForLandScape.viewGone()
-            } else {
-                mVideoSurfaceViewNone.seekTo(0)
-                mVideoSurfaceViewNone.start()
-
-                mediaPlayerTop?.seekTo(0)
-                mediaPlayerTop?.start()
-                mVideoWidth = videoWidth
-                mVideoHeight = videoHeight
-                mVideoWidth /= weigth
-                mVideoHeight /= higth
-                val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                mVideoSurfaceViewTop.filter = filter
-                mVideoSurfaceViewBottom.viewGone()
-                mVideoSurfaceViewTop.viewVisible()
-                mVideoSurfaceViewFull.viewGone()
-            }
-
-
-        }
-    }
-
-    private fun setVideoWhenBottomBlur() {
-        if (mediaPlayerBottom != null) {
-            binding.apply {
-                if (isLandScapeMode) {
-                    mVideoSurfaceViewNoneLandScape.seekTo(0)
-                    mVideoSurfaceViewNoneLandScape.start()
-                    mediaPlayerBottom?.seekTo(0)
-                    mediaPlayerBottom?.start()
-
-                    mVideoWidth = videoWidth
-                    mVideoHeight = videoHeight
-                    mVideoWidth /= weigth
-                    mVideoHeight /= higth
-                    val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                    mVideoSurfaceViewBottomForLandScape.filter = filter
-
-                    mVideoSurfaceViewTopForLandScape.viewGone()
-                    mVideoSurfaceViewBottomForLandScape.viewVisible()
-                    mVideoSurfaceViewFullForLandScape.viewGone()
-                } else {
-                    mVideoSurfaceViewNone.seekTo(0)
-                    mVideoSurfaceViewNone.start()
-                    mediaPlayerBottom?.seekTo(0)
-                    mediaPlayerBottom?.start()
-                    mVideoWidth = videoWidth
-                    mVideoHeight = videoHeight
-                    mVideoWidth /= weigth
-                    mVideoHeight /= higth
-                    val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                    mVideoSurfaceViewBottom.filter = filter
-                    mVideoSurfaceViewTop.viewGone()
-                    mVideoSurfaceViewBottom.viewVisible()
-                    mVideoSurfaceViewFull.viewGone()
-                }
-
-            }
-        }
-    }
-
-    private fun setVideoWhenFullBlur() {
-        binding.apply {
-            if (isLandScapeMode) {
-                mVideoSurfaceViewNoneLandScape.seekTo(0)
-                mVideoSurfaceViewNoneLandScape.start()
-
-                mediaPlayerFull?.seekTo(0)
-                mediaPlayerFull?.start()
-
-                mVideoWidth = videoWidth
-                mVideoHeight = videoHeight
-                mVideoWidth /= weigth
-                mVideoHeight /= higth
-                val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                mVideoSurfaceViewFullForLandScape.filter = filter
-                mVideoSurfaceViewFullForLandScape.viewVisible()
-
-                layoutBlack.viewVisible()
-                mVideoSurfaceViewTopForLandScape.viewGone()
-                mVideoSurfaceViewBottomForLandScape.viewGone()
-                mVideoSurfaceViewFullForLandScape.viewVisible()
-            } else {
-                mVideoSurfaceViewNone.seekTo(0)
-                mVideoSurfaceViewNone.start()
-                mediaPlayerFull?.seekTo(0)
-                mediaPlayerFull?.start()
-
-                mVideoWidth = videoWidth
-                mVideoHeight = videoHeight
-                mVideoWidth /= weigth
-                mVideoHeight /= higth
-                val filter = BlurEffect2(seekbarRadius, mVideoWidth, mVideoHeight)
-                mVideoSurfaceViewFull.filter = filter
-
-                layoutBlack.viewVisible()
-                mVideoSurfaceViewTop.viewGone()
-                mVideoSurfaceViewBottom.viewGone()
-                mVideoSurfaceViewFull.viewVisible()
-            }
-        }
-    }
-
-    private fun setBlurs() {
-        if (mediaPlayerTop == null) {
-            mediaPlayerTop = MediaPlayer()
-            mediaPlayerTop?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewTop.holder.setFixedSize(mvideoWidth, mvideoHeight)
-            binding.mVideoSurfaceViewTop.init(
-                mediaPlayerTop, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerTop?.setDataSource(bottomBlurOutput)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        if (mediaPlayerBottom == null) {
-            mediaPlayerBottom = MediaPlayer()
-            mediaPlayerBottom?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewBottom.holder.setFixedSize(mvideoWidth, mvideoHeight)
-
-            binding.mVideoSurfaceViewBottom.init(
-                mediaPlayerBottom, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerBottom?.setDataSource(bottomBlurOutputTwo)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        if (mediaPlayerFull == null) {
-            mediaPlayerFull = MediaPlayer()
-            mediaPlayerFull?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewFull.holder.setFixedSize(mvideoWidth, mvideoHeight)
-
-            binding.mVideoSurfaceViewFull.init(
-                mediaPlayerFull, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerFull?.setDataSource(originalPath!!)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
         }
 
     }
 
-    private fun setBlursForLandScape() {
-        if (mediaPlayerTop == null) {
-            mediaPlayerTop = MediaPlayer()
-            mediaPlayerTop?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewTopForLandScape.holder.setFixedSize(mvideoWidth, mvideoHeight)
-            binding.mVideoSurfaceViewTopForLandScape.init(
-                mediaPlayerTop, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerTop?.setDataSource(bottomBlurOutput)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        if (mediaPlayerBottom == null) {
-            mediaPlayerBottom = MediaPlayer()
-
-            mediaPlayerBottom?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewBottomForLandScape.holder.setFixedSize(
-                mvideoWidth, mvideoHeight
-            )
-
-            binding.mVideoSurfaceViewBottomForLandScape.init(
-                mediaPlayerBottom, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerBottom?.setDataSource(bottomBlurOutputTwo)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        if (mediaPlayerFull == null) {
-            mediaPlayerFull = MediaPlayer()
-            mediaPlayerFull?.setVolume(0F, 0F)
-            getHeight(originalPath!!)
-            var mvideoWidth = videoWidth
-            var mvideoHeight = videoHeight
-            mvideoWidth /= weigth
-            mvideoHeight /= higth
-            binding.mVideoSurfaceViewFullForLandScape.holder.setFixedSize(mvideoWidth, mvideoHeight)
-
-            binding.mVideoSurfaceViewFullForLandScape.init(
-                mediaPlayerFull, BlurEffect2(10, mvideoWidth, mvideoHeight)
-            )
-            try {
-                mediaPlayerFull?.setDataSource(originalPath!!)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-        }
-
-    }
-
-    private fun execFfmpegBinaryForCrop(
-        command: Array<String>, type: String
-    ) {
-        enableStatisticsCallback("bottomCrop")
-//        enableStatisticsCallbacks()
-        lifecycleScope.launch {
-            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
-                when (returnCode) {
-                    Config.RETURN_CODE_SUCCESS -> {
-                        dialog.dismiss()
-                        isCompression = false
-                        binding.videoView1.stopPlayback()
-                        binding.relForGetValues.viewGone()
-                        binding.relParent.viewVisible()
-
-                        if (isLandScapeMode) {
-                            binding.seekbarLayout.viewGone()
-                            binding.relLayoutLandScape.viewVisible()
-                            binding.mVideoSurfaceViewNoneLandScape.viewVisible()
-
-                            setVideoViewLandScape(fullOutPut, type)
-                        } else {
-                            binding.seekbarLayout.viewVisible()
-                            binding.relLayout.viewVisible()
-                            binding.mVideoSurfaceViewNone.viewVisible()
-                            setVideoView(fullOutPut)
-                        }
-
-                    }
-                    Config.RETURN_CODE_CANCEL -> {
-                        isBlurred = false
-//                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
-                        Log.e(Config.TAG, "Async command execution canceled by user")
-                    }
-                }
-            }
-            progressId = executionId
-        }
-    }
-
-    private fun execFfmpegBinaryForBottomCrop(
-        command: Array<String>, outPut: String, type: String
-    ) {
-        lifecycleScope.launch {
-            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
-                when (returnCode) {
-                    Config.RETURN_CODE_SUCCESS -> {
-
-                    }
-                    Config.RETURN_CODE_CANCEL -> {
-                        isBlurred = false
-                        Log.e(Config.TAG, "Async command execution canceled by user")
-                    }
-                }
-            }
-
-            progressId = executionId
-        }
-    }
-
-    private fun execFfmpegBinaryForBottomCropTop(
-        command: Array<String>, outPut: String, type: String
-    ) {
-        lifecycleScope.launch {
-            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
-                when (returnCode) {
-                    Config.RETURN_CODE_SUCCESS -> {
-
-                    }
-                    Config.RETURN_CODE_CANCEL -> {
-                        isBlurred = false
-                        Log.e(Config.TAG, "Async command execution canceled by user")
-                    }
-                }
-            }
-            progressId = executionId
-        }
-    }
-
-    /* These are the clicks of blur filters */
-    override fun onClick(view: View?) {
-        binding.apply {
-            when (view?.id) {
-                R.id.cv_non_blur -> {
-                    if (isLandScapeMode) {
-                        layoutBlack.viewGone()
-                        nonBlur = true
-                        cvTopBlur.isEnabled = true
-                        cvBottomBlur.isEnabled = true
-                        cvFullBlur.isEnabled = true
-                        finalVideo = ""
-                        blurLinearlayout.viewGone()
-                        defaultView()
-                        setNonBlur()
-                        mVideoSurfaceViewNoneLandScape.viewVisible()
-                        if (isBlurred) {
-                            mVideoSurfaceViewTopForLandScape.viewGone()
-                            mVideoSurfaceViewBottomForLandScape.viewGone()
-                            mVideoSurfaceViewFullForLandScape.viewGone()
-                            videoPauseBtnLandScape.viewVisible()
-                            videoPlayBtnLandScape.viewGone()
-
-                            isBlurred = false
-                            isShowBackDialogue = false
-                            mVideoSurfaceViewNoneLandScape.stopPlayback()
-                            if (isMuted) {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(mutedVideo)
-                            } else if (isDistortion) {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(distortedVideo)
-                            } else {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(originalPath!!)
-                                disableShareAndSave()
-                            }
-                            mVideoSurfaceViewNoneLandScape.start()
-                        } else {
-                            isBlurred = false
-                            isShowBackDialogue = false
-                            videoPauseBtnLandScape.viewVisible()
-                            videoPlayBtnLandScape.viewGone()
-                            mVideoSurfaceViewNoneLandScape.stopPlayback()
-                            if (isMuted) {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(mutedVideo)
-                            } else if (isDistortion) {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(distortedVideo)
-                            } else {
-                                mVideoSurfaceViewNoneLandScape.setVideoPath(originalPath!!)
-                                disableShareAndSave()
-                            }
-                            mVideoSurfaceViewNoneLandScape.start()
-                        }
-                    } else {
-                        nonBlur = true
-                        cvTopBlur.isEnabled = true
-                        cvBottomBlur.isEnabled = true
-                        cvFullBlur.isEnabled = true
-                        finalVideo = ""
-                        blurLinearlayout.viewGone()
-                        defaultView()
-                        setNonBlur()
-                        mVideoSurfaceViewNone.viewVisible()
-                        if (isBlurred) {
-                            mVideoSurfaceViewTop.viewGone()
-                            mVideoSurfaceViewBottom.viewGone()
-                            mVideoSurfaceViewFull.viewGone()
-                            exoPause.viewVisible()
-                            exoPlay.viewGone()
-                            isBlurred = false
-                            isShowBackDialogue = false
-                            mVideoSurfaceViewNone.stopPlayback()
-                            if (isMuted) {
-                                mVideoSurfaceViewNone.setVideoPath(mutedVideo)
-                            } else if (isDistortion) {
-                                mVideoSurfaceViewNone.setVideoPath(distortedVideo)
-                            } else {
-                                mVideoSurfaceViewNone.setVideoPath(originalPath!!)
-                                disableShareAndSave()
-                            }
-                            mVideoSurfaceViewNone.start()
-                        } else {
-                            isBlurred = false
-                            isShowBackDialogue = false
-                            exoPause.viewVisible()
-                            exoPlay.viewGone()
-                            mVideoSurfaceViewNone.stopPlayback()
-                            if (isMuted) {
-                                mVideoSurfaceViewNone.setVideoPath(mutedVideo)
-                            } else if (isDistortion) {
-                                mVideoSurfaceViewNone.setVideoPath(distortedVideo)
-                            } else {
-                                mVideoSurfaceViewNone.setVideoPath(originalPath!!)
-                                disableShareAndSave()
-                            }
-                            mVideoSurfaceViewNone.start()
-                        }
-                    }
-
-                }
-                R.id.cv_top_blur -> {
-                    layoutBlack.viewGone()
-                    defaultView()
-                    setTopBlur()
-                    blurVideoCommands(0, blurSeekbar.progress)
-                }
-                R.id.cv_bottom_blur -> {
-                    layoutBlack.viewGone()
-                    defaultView()
-                    setBottomBlur()
-                    blurVideoCommands(1, blurSeekbar.progress)
-                }
-                R.id.cv_full_blur -> {
-                    layoutBlack.viewVisible()
-
-                    defaultView()
-                    setFullBlur()
-                    blurVideoCommands(2, blurSeekbar.progress)
-                }
-            }
-        }
-    }
-
-    private fun videoCutForFullVideoCommand(input: String, output: String, type: String) {
-        getHeight(input)
-        var crop = ""
-        if (videoWidth == 1920) {
-//            crop = String.format(
-//                "crop=%d:%d:%d:%d",
-//                videoHeight,
-//                videoWidth,
-//                0,
-//                0
-//            )
-            crop = String.format("crop=%d:%d:%d:%d", videoWidth, videoHeight, 0, 0)
-        } else {
-            crop = String.format("crop=%d:%d:%d:%d", videoWidth, videoHeight, 0, 0)
-        }
-
-        val cmd = arrayOf(
-            "-y", "-i", input, "-filter_complex", crop, "-b:v", "8000k", output
-        )
-        execFfmpegBinaryForCrop(cmd, type)
-    }
-
-    private fun videoCutForTopCommand(input: String, output: String, type: String) {
-        getHeight(input)
-        var crop = ""
-        if (videoWidth == 1920) {
-            if (isLandScapeMode) {
-                crop = String.format(
-                    "crop=%d:%d:%d:%d",
-                    videoWidth,
-                    videoHeight / 2,
-                    0,
-                    0,
-                )
-            } else {
-                crop = String.format(
-                    "crop=%d:%d:%d:%d",
-                    videoHeight,
-                    videoWidth / 2,
-                    0,
-                    0,
-                )
-            }
-
-        } else {
-            crop = String.format(
-                "crop=%d:%d:%d:%d",
-                videoWidth,
-                videoHeight / 2,
-                0,
-                0,
-            )
-        }
-
-        val cmd = arrayOf(
-            "-y", "-i", input, "-filter_complex", crop, "-b:v", "8000k", output
-        )
-        execFfmpegBinaryForBottomCropTop(cmd, output, type)
-    }
-
-    private fun videoCutForBottomCommand(input: String, output: String, type: String) {
-        getHeight(input)
-        var crop = ""
-        if (videoWidth == 1920) {
-            if (isLandScapeMode) {
-                crop = String.format(
-                    "crop=%d:%d:%d:%d",
-                    videoWidth,
-                    videoHeight / 2,
-                    0,
-                    videoHeight / 2,
-                )
-            } else {
-                crop = String.format(
-                    "crop=%d:%d:%d:%d",
-                    videoHeight,
-                    videoWidth / 2,
-                    0,
-                    0,
-                )
-            }
-
-        } else {
-            crop = String.format(
-                "crop=%d:%d:%d:%d",
-                videoWidth,
-                videoHeight / 2,
-                0,
-                videoHeight / 2,
-            )
-        }
-
-        val cmd = arrayOf(
-            "-y", "-i", input, "-filter_complex", crop, "-b:v", "8000k", output
-        )
-        execFfmpegBinaryForBottomCrop(cmd, output, type)
-    }
-
-
-    private fun resizeVideo(type: String) {
+    /* This function is call for scale down the resolution of videos */
+    private fun executeResolutionDown() {
+//        val cmd = arrayOf(
+//            "-i",
+//            getNewPath(originalPath!!),
+//            "-vf",
+//            "scale=480:852",
+//            "-b:v",
+//            "8000k",
+//            lessResolatedFile
+//        )
         val cmd = arrayOf(
             "-i",
             getNewPath(originalPath!!),
             "-vf",
-            "scale=480:320",
-            "-b:v",
-            "8000k",
+            "scale=480:852",
+            "-map",
+            "0",
+            "-c:a",
+            "copy",
+            "-c:s",
+            "copy",
             lessResolatedFile
         )
-        execFfmpegForResolutionDown(cmd, lessResolatedFile, type)
+        execFfmpegForResolutionDown(cmd)
     }
 
-    private fun compressVideo() {
-        VideoCompress.compressVideoLow(getRealPathFromUri(applicationContext, Uri.parse(video)),
-            compressFile,
-            object : VideoCompress.CompressListener {
-                override fun onStart() {
-                    isInitialBlurValue = true
-                    isInitialBlurValueDistortion = true
+
+    private fun executeResolutionDownn() {
+        getHeight(originalPath!!)
+        if (videoWidth > 500) {
+            GlobalScope.launch {
+                VideoCompressor.start(
+                    context = applicationContext,
+                    uris,
+                    isStreamable = false,
+                    sharedStorageConfiguration = SharedStorageConfiguration(
+                        saveAt = SaveLocation.movies, videoName = "compressed_video"
+                    ),
+                    // OR AND NOT BOTH
+                    appSpecificStorageConfiguration = AppSpecificStorageConfiguration(
+                        videoName = "compressed_video", // => required name
+                        subFolderName = "my-videos" // => optional and ONLY if exists
+                    ),
+                    configureWith = Configuration(
+                        quality = VideoQuality.MEDIUM,
+                        isMinBitrateCheckEnabled = true,
+                        videoBitrateInMbps = 5, /*Int, ignore, or null*/
+                        videoWidth = 852.0,
+                        videoHeight = 480.0,
+                    ),
+
+                    listener = object : CompressionListener {
+                        override fun onProgress(index: Int, percent: Float) {
+                            //Update UI
+                            if (percent <= 100 && percent.toInt() % 5 == 0) runOnUiThread {
+                                popUpForCompressedVideo.showProgress(percent)
+                                popUpForCompressedVideo.isCancelable = false
+                            }
+                        }
+
+                        override fun onStart(index: Int) {
+//                        popUpForCompressedVideo = DialogueForShowVideoProgress()
+                            popUpForCompressedVideo.show(supportFragmentManager, "")
+                        }
+
+                        override fun onSuccess(index: Int, size: Long, path: String?) {
+                            showToast("Success1")
+                            getHeight(path!!)
+                            originalPath = path
+                            preparePlayer(Uri.parse(path))
+                            popUpForCompressedVideo.dismiss()
+                        }
+
+                        override fun onFailure(index: Int, failureMessage: String) {
+                            Log.wtf("failureMessage", failureMessage)
+                        }
+
+                        override fun onCancelled(index: Int) {
+                            Log.wtf("TAG", "compression has been cancelled")
+                            // make UI changes, cleanup, etc
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+
+    /* This function is call for update the seekbar and show time */
+    private fun updateProgress() {
+        if (exoPlayer != null) {
+            val timeLeft: Long = exoPlayer!!.duration - exoPlayer!!.contentPosition
+            val delayMs: Long = TimeUnit.SECONDS.toMillis(1)
+            mHandler?.postDelayed(updateProgressAction, delayMs)
+
+            if (calculateTimeLeft(timeLeft) == "-12:-55") {
+                duration.text = Constants.formatSeconds(totalDuration)
+            } else {
+                "-${this.calculateTimeLeft(timeLeft)}".also { duration.text = it }
+            }
+        }
+    }
+
+    /* This function is call for calculate remaining time */
+    private fun calculateTimeLeft(timeLeft: Long): String {
+        return String.format(
+            "%d:%02d",
+            TimeUnit.MILLISECONDS.toMinutes(timeLeft) % TimeUnit.HOURS.toMinutes(1),
+            TimeUnit.MILLISECONDS.toSeconds(timeLeft) % TimeUnit.MINUTES.toSeconds(1)
+        )
+    }
+
+    /* This function is initialize and set exoplayer */
+    private fun preparePlayer(uri: Uri) {
+        val loadControl: LoadControl = DefaultLoadControl.Builder()
+            .setAllocator(DefaultAllocator(true, 16))
+            .setBufferDurationsMs(
+                MIN_BUFFER_DURATION,
+                MAX_BUFFER_DURATION,
+                MIN_PLAYBACK_START_BUFFER,
+                MIN_PLAYBACK_RESUME_BUFFER
+            )
+            .setTargetBufferBytes(-1)
+            .setPrioritizeTimeOverSizeThresholds(true).build()
+
+        val trackSelector: TrackSelector = DefaultTrackSelector(this@VideoEditActivity)
+
+        exoPlayer = ExoPlayer.Builder(this@VideoEditActivity)
+            .setLoadControl(loadControl)
+            .setTrackSelector(trackSelector)
+            .build()
+        binding.playerView.player = exoPlayer
+        exoPlayer?.playWhenReady = true
+        val mediaItem = MediaItem.fromUri(uri)
+        exoPlayer?.setMediaItem(mediaItem)
+        exoPlayer?.prepare()
+        exoPlayer?.play()
+    }
+
+    /* This function is releasing the player */
+    private fun releasePlayer() {
+        exoPlayer?.let { player ->
+            playbackPosition = player.currentPosition
+            playWhenReady = player.playWhenReady
+            player.release()
+            exoPlayer = null
+        }
+    }
+
+    private val videoPlayerListener = object : Player.Listener {
+        @Deprecated("Deprecated in Java")
+        override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_ENDED -> {
+                    totalTime.viewVisible()
+                    duration.viewGone()
+                    totalTime.text = Constants.formatSeconds(totalDuration)
                 }
+                Player.STATE_READY -> {
+                    totalTime.viewGone()
+                    duration.viewVisible()
+                }
+            }
+        }
 
-                override fun onSuccess(compressVideoPath: String) {
-                    lifecycleScope.launch {
-                        muteCommand(compressVideoPath)
-                        audioExtractCommand(compressVideoPath)
+    }
 
+    override fun onStop() {
+        super.onStop()
+        releasePlayer()
+        mHandler?.removeCallbacks(updateProgressAction)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (progressId != 0L) {
+            FFmpeg.cancel(progressId)
+            FFmpeg.cancel()
+        }
+        mHandler?.removeCallbacks(updateProgressAction)
+        releasePlayer()
+        topBlur = false
+        nonBlur = false
+        bottomBlur = false
+        fullBlur = false
+        deleteFiles()
+        clearSessionsOfFullTopAndBottomBlur()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun listeners() {
+        binding.blurSeekbar.setOnSeekBarChangeListener(this)
+        binding.blurSeekbar.progress = 50
+        binding.blurSeekbar.max = 100
+
+        binding.homeToolbarId.ivBack.applyBoomEffect(true)
+        binding.homeToolbarId.ivBack.setOnClickListener {
+            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
+                override fun onGoToHomeOk() {
+                    finish()
+                    exitPopup.dismiss()
+                    if (progressId != 0L) {
+                        FFmpeg.cancel(progressId)
+                        FFmpeg.cancel()
                     }
+                    deleteFiles()
+                    clearSessionsOfFullTopAndBottomBlur()
                 }
 
-                override fun onFail() {
-
+                override fun onGoToHomeCancel() {
+                    exitPopup.dismiss()
                 }
 
-                override fun onProgress(percent: Float) {
-//                    if (percent <= 100) runOnUiThread {
-//                        setProgressVideoCut((percent.toInt() / 2).toFloat())
-//                    }
-                }
-            })
+            }, "back")
+            exitPopup.show(supportFragmentManager, "")
+            exitPopup.isCancelable = true
+        }
+
+        binding.homeToolbarId.ivShare.applyBoomEffect(true)
+        binding.homeToolbarId.ivShare.setOnClickListener {
+            val uri = FileProvider.getUriForFile(
+                this, "$packageName.provider", File(finalVideo)
+            )
+
+            val sharingIntent = Intent(Intent.ACTION_SEND)
+            sharingIntent.type = "video/*"
+            sharingIntent.putExtra(
+                Intent.EXTRA_TEXT,
+                "Create By : Censor X \n\n https://play.google.com/store/apps/details?id=$packageName"
+            )
+
+            sharingIntent.putExtra(Intent.EXTRA_STREAM, uri)
+            startActivity(Intent.createChooser(sharingIntent, "Share Video"))
+        }
+
+        binding.homeToolbarId.ivDownload.applyBoomEffect(true)
+        binding.homeToolbarId.ivDownload.setOnClickListener {
+            if (finalVideo.isNotEmpty()) saveVideo(finalVideo)
+        }
+
+        binding.buttonLayouts.buttonRemoveAudio.applyBoomEffect(true)
+        binding.buttonLayouts.buttonRemoveAudio.setOnClickListener {
+            resetAudioButtonItems()
+            audioDistortion.viewGone()
+            audioRemove.viewVisible()
+            binding.buttonLayouts.buttonRemoveAudio.background = ContextCompat.getDrawable(
+                this@VideoEditActivity, R.drawable.ss_corner_round_light_blue
+            )
+
+            binding.buttonLayouts.ivRemoveAudio.apply {
+                setImageDrawable(
+                    ContextCompat.getDrawable(
+                        context, R.drawable.ic_remove
+                    )
+                )
+                setColorFilter(
+                    ContextCompat.getColor(
+                        context, R.color.white
+                    )
+                )
+            }
+            binding.buttonLayouts.tvRemoveAudio.setTextColor(
+                ContextCompat.getColor(
+                    this, R.color.white
+                )
+            )
+            muteVideoCommands()
+        }
+
+        binding.buttonLayouts.buttonRemoveDistortion.applyBoomEffect(true)
+        binding.buttonLayouts.buttonRemoveDistortion.setOnClickListener {
+            resetAudioButtonItems()
+            binding.buttonLayouts.buttonRemoveDistortion.background = ContextCompat.getDrawable(
+                this@VideoEditActivity, R.drawable.ss_corner_round_light_blue
+            )
+
+            binding.buttonLayouts.ivAddDistortion.apply {
+                setImageDrawable(
+                    ContextCompat.getDrawable(
+                        context, R.drawable.ic_disortion
+                    )
+                )
+                setColorFilter(
+                    ContextCompat.getColor(
+                        context, R.color.white
+                    )
+                )
+            }
+
+            binding.buttonLayouts.tvAddDistortion.setTextColor(
+                ContextCompat.getColor(
+                    this@VideoEditActivity, R.color.white
+                )
+            )
+            audioExtractCommand()
+        }
+
+        //todo
+        binding.buttonNoEffect.applyBoomEffect(true)
+        binding.buttonNoEffect.setOnClickListener {
+            binding.buttonNoEffect.isEnabled = false
+            isNoEffect = true
+            audioDistortion.viewGone()
+            audioRemove.viewGone()
+            releasePlayer()
+            resetAudioButtonItems()
+            binding.buttonNoEffect.background = ContextCompat.getDrawable(
+                this@VideoEditActivity, R.drawable.ss_corner_round_white
+            )
+            if (isBlurAndMuted) {
+                setExoPlayer(secondOutputForBlur)
+                isMuted = false
+                isDistortion = false
+                binding.buttonLayouts.buttonRemoveDistortion.isEnabled = true
+            } else if (isBlurred && isMuted) {
+                setExoPlayer(outputForBlurredVideo)
+                isMuted = false
+            } else if (isBlurred && isDistortion) {
+                setExoPlayer(outputForBlurredVideo)
+                isDistortion = false
+            } else if (isMuted) {
+                setExoPlayer(originalPath!!)
+                isMuted = false
+                binding.buttonLayouts.buttonRemoveAudio.isEnabled = true
+            } else if (isDistortion) {
+                setExoPlayer(originalPath!!)
+                isDistortion = false
+                binding.buttonLayouts.buttonRemoveDistortion.isEnabled = true
+            }
+
+            clearSessionsOfFullTopAndBottomBlur()
+        }
+
+        binding.cvNonBlur.setOnClickListener(this)
+        binding.cvTopBlur.setOnClickListener(this)
+        binding.cvBottomBlur.setOnClickListener(this)
+        binding.cvFullBlur.setOnClickListener(this)
     }
 
+    private fun setExoPlayer(url: String) {
+        preparePlayer(Uri.parse(url))
+        mHandler = Handler()
+        mHandler?.post(updateProgressAction)
+        updateProgress()
+        exoPlayer?.addListener(videoPlayerListener)
+        finalVideo = url
+    }
+
+    //Custom Bottom navigation View
+    private fun setBottomLayout() {
+        binding.ivCensor.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_censor_selected
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.white
+                )
+            )
+        }
+        binding.tvCenser.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.white
+            )
+        )
+
+        binding.viewCensor.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+        binding.viewAudio.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.grey_color
+            )
+        )
+        binding.censorLayout.setOnClickListener {
+            censorTab()
+            setCensorVisibility()
+            audioChangeLayout.viewGone()
+
+        }
+        binding.audioLayout.setOnClickListener {
+            audioTab()
+            setAudioVisibility()
+            audioChangeLayout.viewVisible()
+        }
+    }
+
+    private fun setCensorVisibility() {
+        binding.run {
+            blurLayouts.viewVisible()
+            layoutAudioChangeButton.viewGone()
+            buttonNoEffect.viewGone()
+        }
+
+        if (topBlur || bottomBlur || fullBlur) binding.blurLinearlayout.viewVisible()
+        else binding.blurLinearlayout.viewGone()
+
+    }
+
+    private fun setAudioVisibility() {
+        binding.run {
+            blurLinearlayout.viewGone()
+            blurLayouts.viewGone()
+            layoutAudioChangeButton.viewVisible()
+            buttonNoEffect.viewVisible()
+        }
+    }
+
+    private fun censorTab() {
+        resetItems()
+        binding.ivCensor.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_censor_selected
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.white
+                )
+            )
+        }
+        binding.tvCenser.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.white
+            )
+        )
+        binding.viewCensor.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+    }
+
+    private fun audioTab() {
+        resetItems()
+        binding.ivSpeaker.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_speaker_selected
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.white
+                )
+            )
+        }
+        binding.tvAudio.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.white
+            )
+        )
+
+        binding.viewAudio.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+    }
+
+    private fun resetItems() {
+        binding.ivCensor.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_censor_unfilled
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.grey_color
+                )
+            )
+        }
+        binding.tvCenser.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            )
+        )
+
+        binding.viewCensor.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.grey_color
+            )
+        )
+
+        binding.ivSpeaker.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_speaker_unfilled
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.grey_color
+                )
+            )
+        }
+        binding.tvAudio.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            )
+        )
+
+        binding.viewAudio.setBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.grey_color
+            )
+        )
+
+    }
+
+    private fun resetAudioButtonItems() {
+        binding.buttonLayouts.buttonRemoveAudio.background = ContextCompat.getDrawable(
+            this@VideoEditActivity, R.drawable.ss_corner_round_dark_blue
+        )
+        binding.buttonLayouts.buttonRemoveDistortion.background = ContextCompat.getDrawable(
+            this@VideoEditActivity, R.drawable.ss_corner_round_dark_blue
+        )
+        binding.buttonLayouts.ivRemoveAudio.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_remove_unfilled
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.grey_color
+                )
+            )
+        }
+        binding.buttonLayouts.tvRemoveAudio.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            )
+        )
+
+        binding.buttonLayouts.ivAddDistortion.apply {
+            setImageDrawable(
+                ContextCompat.getDrawable(
+                    context, R.drawable.ic_disortion_unfilled
+                )
+            )
+            setColorFilter(
+                ContextCompat.getColor(
+                    context, R.color.grey_color
+                )
+            )
+        }
+        binding.buttonLayouts.tvAddDistortion.setTextColor(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            )
+        )
+    }
+
+    /* These are the clicks of blur filters */
+    override fun onClick(view: View?) {
+        when (view?.id) {
+            R.id.cv_non_blur -> {
+                nonBlur = true
+                binding.cvTopBlur.isEnabled = true
+                binding.cvBottomBlur.isEnabled = true
+                binding.cvFullBlur.isEnabled = true
+                isBlurred = false
+                isBlurAndMuted = false
+                blurAndMuted = false
+                finalVideo = ""
+                binding.blurLinearlayout.viewGone()
+                defaultView()
+                setNonBlur()
+                releasePlayer()
+                if (isBlurred && isMuted) {
+                    finalVideo = mutedVideo
+                    preparePlayer(Uri.parse(mutedVideo))
+                } else if (isBlurred && isDistortion) {
+                    setExoPlayer(finalDistortedVideo)
+                } else if (topBlur || bottomBlur || fullBlur) {
+                    setExoPlayer(fileUri.toString())
+                }
+            }
+
+            R.id.cv_top_blur -> {
+                defaultView()
+                setTopBlur()
+                blurVideoCommands(0, binding.blurSeekbar.progress)
+            }
+            R.id.cv_bottom_blur -> {
+                defaultView()
+                setBottomBlur()
+                blurVideoCommands(1, binding.blurSeekbar.progress)
+            }
+            R.id.cv_full_blur -> {
+                defaultView()
+                setFullBlur()
+                blurVideoCommands(2, binding.blurSeekbar.progress)
+            }
+        }
+    }
+
+    /* This function is set default view of filter layout */
+    private fun defaultView() {
+        binding.cvNonBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this, R.color.un_selected_button
+            )
+        )
+        binding.tvNoneBlur.setTextColor(ContextCompat.getColor(this, R.color.grey_color))
+        binding.ivNoneBlur.setColorFilter(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            ), PorterDuff.Mode.SRC_IN
+        )
+
+
+        binding.cvTopBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this, R.color.un_selected_button
+            )
+        )
+        binding.tvTopBlur.setTextColor(ContextCompat.getColor(this, R.color.grey_color))
+        binding.ivTopBlur.setColorFilter(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            ), PorterDuff.Mode.SRC_IN
+        )
+
+
+        binding.cvBottomBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this, R.color.un_selected_button
+            )
+        )
+        binding.tvBottomBlur.setTextColor(ContextCompat.getColor(this, R.color.grey_color))
+        binding.ivBottomBlur.setColorFilter(
+            ContextCompat.getColor(
+                this, R.color.grey_color
+            ), PorterDuff.Mode.SRC_IN
+        )
+
+
+        binding.cvFullBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this, R.color.un_selected_button
+            )
+        )
+        binding.tvFullBlur.setTextColor(ContextCompat.getColor(this, R.color.grey_color))
+        binding.ivFullBlur.setImageResource(R.drawable.ic_full_blur)
+    }
+
+    private fun setNonBlur() {
+        binding.cvNonBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.selected_btn_color
+            )
+        )
+        binding.tvNoneBlur.setTextColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+        binding.ivNoneBlur.setColorFilter(
+            ContextCompat.getColor(this@VideoEditActivity, R.color.white), PorterDuff.Mode.SRC_IN
+        )
+
+    }
+
+    private fun setTopBlur() {
+        binding.cvTopBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.selected_btn_color
+            )
+        )
+        binding.tvTopBlur.setTextColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+
+        binding.ivTopBlur.setColorFilter(
+            ContextCompat.getColor(this@VideoEditActivity, R.color.white), PorterDuff.Mode.SRC_IN
+        )
+
+    }
+
+    private fun setBottomBlur() {
+        binding.cvBottomBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.selected_btn_color
+            )
+        )
+        binding.tvBottomBlur.setTextColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+
+        binding.ivBottomBlur.setColorFilter(
+            ContextCompat.getColor(this@VideoEditActivity, R.color.white), PorterDuff.Mode.SRC_IN
+        )
+
+    }
+
+    private fun setFullBlur() {
+        binding.cvFullBlur.setCardBackgroundColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.selected_btn_color
+            )
+        )
+        binding.tvFullBlur.setTextColor(
+            ContextCompat.getColor(
+                this@VideoEditActivity, R.color.white
+            )
+        )
+        binding.ivFullBlur.setImageResource(R.drawable.ic_full_blur_white)
+    }
+
+    override fun onProgressChanged(seekBar: SeekBar, progress: Int, p2: Boolean) {
+        val whatToSay: String = progress.toString()
+        binding.textView.text = whatToSay
+        val `val` = progress * (seekBar.width - 3 * seekBar.thumbOffset) / seekBar.max
+        "$progress%".also { binding.textView.text = it }
+        binding.textView.x = seekBar.x + `val` + seekBar.thumbOffset / 2
+    }
+
+    override fun onStartTrackingTouch(p0: SeekBar?) {
+
+    }
+
+    //fixme
+    override fun onStopTrackingTouch(seeBar: SeekBar?) {
+        if (topBlur) {
+            clearSessionTopBlur()
+            blurVideoCommands(0, seeBar!!.progress)
+        } else if (bottomBlur) {
+            clearSessionBottomBlur()
+            blurVideoCommands(1, seeBar!!.progress)
+        } else {
+            clearSessionFullBlur()
+            blurVideoCommands(2, seeBar!!.progress)
+        }
+    }
+
+    /* This function is set for execute ffmpeg command for scale down resolution of image
+    *  https://github.com/tanersener/mobile-ffmpeg
+    *  */
     private fun execFfmpegForResolutionDown(
-        command: Array<String>, output: String, type: String
+        command: Array<String>
     ) {
+        showDialog()
+        enableStatisticsCallback()
         isCompression = true
-        setProgressDialogue("process")
-        enableStatisticsCallback("resize")
-        Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
         val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
             when (returnCode) {
                 Config.RETURN_CODE_SUCCESS -> {
+                    binding.playerView.viewVisible()
                     isCompression = false
-                    processComplete = false
-                    originalPath = output
-                    lifecycleScope.launch {
-                        videoCutForFullVideoCommand(
-                            originalPath!!, fullOutPut, "compress"
-                        )
-
-                        videoCutForTopCommand(originalPath!!, bottomBlurOutput, type)
-                        videoCutForBottomCommand(originalPath!!, bottomBlurOutputTwo, type)
-                    }
-
+                    originalPath = lessResolatedFile
+                    getHeight(lessResolatedFile)
+                    preparePlayer(Uri.parse(lessResolatedFile))
+                    mHandler = Handler()
+                    mHandler?.post(updateProgressAction)
+                    updateProgress()
+                    exoPlayer?.addListener(videoPlayerListener)
+                    popUpForCompressedVideo.dismiss()
                 }
                 Config.RETURN_CODE_CANCEL -> {
                     isDistortion = false
-//                    Toast.makeText(this, "Fail", Toast.LENGTH_SHORT).show()
-                    Log.e(Config.TAG, "Async command execution canceled by user")
-                }
-                else -> {
-
+                    Toast.makeText(this, "Fail", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -1100,746 +1084,93 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         progressId = executionId
     }
 
-    /* This function is call for update the seekbar and show time */
-    private fun updateProgress() {
-        var timeLeft: Long? = null
-        timeLeft =
-            (binding.mVideoSurfaceViewNone.duration - binding.mVideoSurfaceViewNone.currentPosition).toLong()
 
-        val delayMs: Long = TimeUnit.SECONDS.toMillis(1)
-        mHandler?.postDelayed(updateProgressAction, delayMs)
-
-        if (calculateTimeLeft(timeLeft) == "-12:-55") {
-            duration.text = Constants.formatSeconds(totalDuration)
-        } else {
-            "-${this.calculateTimeLeft(timeLeft)}".also {
-                duration.text = it
-            }
-        }
-
-
-    }
-
-    private fun updateProgressForLandScape() {
-        var timeLeft: Long? = null
-        timeLeft =
-            (binding.mVideoSurfaceViewNoneLandScape.duration - binding.mVideoSurfaceViewNoneLandScape.currentPosition).toLong()
-        val delayMs: Long = TimeUnit.SECONDS.toMillis(1)
-        mHandler?.postDelayed(updateProgressActionForLandScape, delayMs)
-
-        if (calculateTimeLeft(timeLeft) == "-12:-55") {
-            durationLandScape.text = Constants.formatSeconds(totalDuration)
-        } else {
-            "-${this.calculateTimeLeft(timeLeft)}".also {
-                durationLandScape.text = it
-            }
-        }
-    }
-
-
-    //fixme
-    override fun onProgressChanged(seekBar: SeekBar, progress: Int, p2: Boolean) {
-        val whatToSay: String = progress.toString()
-        binding.textView.text = whatToSay
-        val `val` = progress * (seekBar.width - 3 * seekBar.thumbOffset) / seekBar.max
-        "$progress%".also { binding.textView.text = it }
-        binding.textView.x = seekBar.x + `val` + seekBar.thumbOffset / 2
-        seekBarForSaveVideo = progress
-
-        if (isLandScapeMode) {
-            lifecycleScope.launch {
-                if (topBlur) {
-                    if (progress <= 2) {
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-//                        binding.mVideoSurfaceViewTopForLandScape.viewGone()
-//                        seekbarRadius = 0
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.mVideoSurfaceViewTopForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewTopForLandScape.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewTopForLandScape.viewVisible()
-                            seekbarRadius = quotent
-                            binding.mVideoSurfaceViewTopForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        var mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.mVideoSurfaceViewTopForLandScape.viewVisible()
-                                seekbarRadius = minusValue
-                                binding.mVideoSurfaceViewTopForLandScape.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewTopForLandScape.viewVisible()
-                            seekbarRadius = quotent
-                            binding.mVideoSurfaceViewTopForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-
-                } else if (bottomBlur) {
-                    if (progress <= 2) {
-//                        binding.mVideoSurfaceViewBottomForLandScape.viewGone()
-//                        seekbarRadius = 0
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.mVideoSurfaceViewBottomForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewBottomForLandScape.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewBottomForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewBottomForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        val mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.mVideoSurfaceViewBottomForLandScape.viewVisible()
-                                binding.mVideoSurfaceViewBottomForLandScape.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewBottomForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewBottomForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-
-                } else if (fullBlur) {
-                    if (progress <= 2) {
-//                        binding.mVideoSurfaceViewTopForLandScape.viewGone()
-//                        binding.mVideoSurfaceViewBottomForLandScape.viewGone()
-//                        seekbarRadius = 0
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.layoutBlack.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.layoutBlack.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        val mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.layoutBlack.viewVisible()
-                                binding.mVideoSurfaceViewFullForLandScape.viewVisible()
-                                binding.mVideoSurfaceViewFullForLandScape.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.layoutBlack.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.viewVisible()
-                            binding.mVideoSurfaceViewFullForLandScape.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-                }
-            }
-        } else {
-            lifecycleScope.launch {
-                if (topBlur) {
-                    if (progress <= 2) {
-//                        binding.mVideoSurfaceViewTop.viewGone()
-//                        seekbarRadius = 0
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.mVideoSurfaceViewTop.viewVisible()
-                            binding.mVideoSurfaceViewTop.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewTop.viewVisible()
-                            seekbarRadius = quotent
-                            binding.mVideoSurfaceViewTop.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        var mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.mVideoSurfaceViewTop.viewVisible()
-                                seekbarRadius = minusValue
-                                binding.mVideoSurfaceViewTop.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewTop.viewVisible()
-                            seekbarRadius = quotent
-                            binding.mVideoSurfaceViewTop.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-
-                } else if (bottomBlur) {
-                    if (progress <= 2) {
-//                        binding.mVideoSurfaceViewBottom.viewGone()
-//                        seekbarRadius = 0
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.mVideoSurfaceViewBottom.viewVisible()
-                            binding.mVideoSurfaceViewBottom.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewBottom.viewVisible()
-                            binding.mVideoSurfaceViewBottom.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        val mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.mVideoSurfaceViewBottom.viewVisible()
-                                binding.mVideoSurfaceViewBottom.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewBottom.viewVisible()
-                            binding.mVideoSurfaceViewBottom.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-
-                } else if (fullBlur) {
-                    if (progress <= 2) {
-                        values = 7
-                        weigth = 5
-                        higth = 5
-                        mVideoWidth /= 5
-                        mVideoHeight /= 5
-                        seekbarRadius = values
-
-                    } else if (progress % 5 == 0) {
-                        var quotent = progress / 5
-                        if ((quotent % 2) == 0) {
-                            var minusValue = quotent - 1
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            minusValue = setBlurRangeValue(minusValue)
-                            binding.mVideoSurfaceViewFull.viewVisible()
-                            binding.mVideoSurfaceViewFull.filter =
-                                BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewFull.viewVisible()
-                            binding.mVideoSurfaceViewFull.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    } else {
-                        val mProgress = 5 * (ceil(abs(progress / 5).toDouble()))
-                        var quotent = mProgress.toInt() / 5
-                        if ((quotent % 2) == 0) {
-                            if (quotent != 0) {
-                                var minusValue = quotent - 1
-                                mVideoWidth = videoWidth
-                                mVideoHeight = videoHeight
-                                minusValue = setBlurRangeValue(minusValue)
-                                binding.mVideoSurfaceViewFull.viewVisible()
-                                binding.mVideoSurfaceViewFull.filter =
-                                    BlurEffect2(minusValue, mVideoWidth, mVideoHeight)
-                            }
-                        } else {
-                            mVideoWidth = videoWidth
-                            mVideoHeight = videoHeight
-                            quotent = setBlurRangeValue(quotent)
-                            binding.mVideoSurfaceViewFull.viewVisible()
-                            binding.mVideoSurfaceViewFull.filter =
-                                BlurEffect2(quotent, mVideoWidth, mVideoHeight)
-                        }
-                    }
-
-                }
-            }
-        }
-
-    }
-
-    override fun onStartTrackingTouch(p0: SeekBar?) {
-
-    }
-
-    override fun onStopTrackingTouch(seeBar: SeekBar?) {
-
-    }
-
-    private fun setBlurRangeValue(value: Int): Int {
-        when (value) {
-            //5-15
-            1 -> {
-                values = 7
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //15-25
-            3 -> {
-                values = 9
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //25-35
-            5 -> {
-                values = 11
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //35-45
-            7 -> {
-                values = 15
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //45-55
-            9 -> {
-                values = 17
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //55-65
-            11 -> {
-                values = 19
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //65-75
-            13 -> {
-                values = 21
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            //75-85
-            13 -> {
-                values = 23
-                weigth = 5
-                higth = 5
-                mVideoWidth /= 5
-                mVideoHeight /= 5
-                seekbarRadius = values
-            }
-            else -> {
-                values = 25
-                weigth = 8
-                higth = 8
-                mVideoWidth /= 8
-                mVideoHeight /= 8
-                seekbarRadius = values
-            }
-        }
-
-        return values
-    }
-
-/* In this function we execute all blur video commands video different checks
-*  https://github.com/tanersener/mobile-ffmpeg
-*  */
+    /* In this function we execute all blur video commands video different checks
+    *  https://github.com/tanersener/mobile-ffmpeg
+    *  */
 
     private fun blurVideoCommands(type: Int, radius: Int) {
         when (type) {
             0 -> {
-                if (isDistortion) setTopBlurView(distortedVideo)
-                else if (isMuted) setTopBlurView(mutedVideo)
-                else setTopBlurView(fullOutPut)
+                if (isDistortion) {
+                    topBlurCommand(finalDistortedVideo, topBlurOutput, type, radius)
+                    topBlurCommandWithOriginalPath(radius)
+                } else if (isMuted) {
+                    topBlurCommand(mutedVideo, topBlurOutput, type, radius)
+                    topBlurCommandWithOriginalPath(radius)
+                } else {
+                    if (getTopBlur() != "") {
+                        isBlurred = true
+                        nonBlur = false
+                        binding.cvTopBlur.isEnabled = false
+                        binding.cvBottomBlur.isEnabled = true
+                        binding.cvFullBlur.isEnabled = true
+                        binding.blurLinearlayout.viewVisible()
+                        outputForBlurredVideo = getTopBlur()
+                        releasePlayer()
+                        finalVideo = ""
+                        setExoPlayer(getTopBlur())
+                        enableShareAndSave()
+                    } else {
+                        topBlurCommand(originalPath!!, topBlurOutput, type, radius)
+                    }
+                }
             }
             1 -> {
-                if (isDistortion) setBottomBlurView(distortedVideo)
-                else if (isMuted) setBottomBlurView(mutedVideo)
-                else setBottomBlurView(fullOutPut)
+                if (isDistortion) {
+                    bottomBlurCommand(finalDistortedVideo, bottomBlurOutput, type, radius)
+                    bottomBlurCommandWithOriginalInput(radius)
+                } else if (isMuted) {
+                    bottomBlurCommand(mutedVideo, bottomBlurOutput, type, radius)
+                    bottomBlurCommandWithOriginalInput(radius)
+                } else {
+                    if (getBottomBlur() != "") {
+                        isBlurred = true
+                        nonBlur = false
+                        binding.cvTopBlur.isEnabled = true
+                        binding.cvBottomBlur.isEnabled = false
+                        binding.cvFullBlur.isEnabled = true
+                        binding.blurLinearlayout.viewVisible()
+                        releasePlayer()
+                        finalVideo = ""
+                        setExoPlayer(getBottomBlur())
+                        enableShareAndSave()
+                    } else {
+                        bottomBlurCommand(originalPath!!, bottomBlurOutput, type, radius)
+                    }
+                }
             }
             else -> {
-                if (isDistortion) setFullBlurView(distortedVideo)
-                else if (isMuted) setFullBlurView(mutedVideo)
-                else setFullBlurView(fullOutPut)
-            }
-        }
-    }
-
-    private fun setBottomBlurView(path: String) {
-        topBlur = false
-        bottomBlur = true
-        fullBlur = false
-        isBlurred = true
-        nonBlur = false
-        isShowBackDialogue = true
-        enableShareAndSave()
-        binding.apply {
-            cvTopBlur.isEnabled = true
-            cvBottomBlur.isEnabled = false
-            cvFullBlur.isEnabled = true
-            blurLinearlayout.viewVisible()
-        }
-        resetPlayer()
-    }
-
-    private fun setTopBlurView(path: String) {
-        topBlur = true
-        bottomBlur = false
-        fullBlur = false
-        isBlurred = true
-        nonBlur = false
-        isShowBackDialogue = true
-        enableShareAndSave()
-        binding.apply {
-            cvTopBlur.isEnabled = false
-            cvBottomBlur.isEnabled = true
-            cvFullBlur.isEnabled = true
-            blurLinearlayout.viewVisible()
-        }
-        resetPlayer()
-    }
-
-    private fun setFullBlurView(path: String) {
-        isBlurred = true
-        nonBlur = false
-        topBlur = false
-        bottomBlur = false
-        fullBlur = true
-        isShowBackDialogue = true
-        enableShareAndSave()
-        binding.apply {
-            cvTopBlur.isEnabled = true
-            cvBottomBlur.isEnabled = true
-            cvFullBlur.isEnabled = false
-            blurLinearlayout.viewVisible()
-        }
-        resetPlayer()
-    }
-
-    private fun setPlayerSeekBar() {
-        mHandler = Handler(Looper.getMainLooper())
-        mHandler?.post(updateProgressAction)
-
-        val updateSeekBar: Runnable = object : Runnable {
-            override fun run() {
-                var mCurrentPosition: Int? = null
-                if (isLandScapeMode) {
-                    mCurrentPosition = binding.mVideoSurfaceViewNoneLandScape.currentPosition
-                    binding.seekbar.max = binding.mVideoSurfaceViewNoneLandScape.duration / 1000
+                if (isDistortion) {
+                    fullBlurCommand(finalDistortedVideo, fullBlurOutput, type, radius)
+                    fullBlurCommandWithOriginalInput(radius)
+                } else if (isMuted) {
+                    fullBlurCommand(mutedVideo, fullBlurOutput, type, radius)
+                    fullBlurCommandWithOriginalInput(radius)
                 } else {
-                    mCurrentPosition = binding.mVideoSurfaceViewNone.currentPosition
-                    binding.seekbar.max = binding.mVideoSurfaceViewNone.duration / 1000
-                }
-                binding.seekbar.progress = mCurrentPosition / 1000
-                binding.seekbar.postDelayed(this, 500)
-
-            }
-        }
-        runOnUiThread(updateSeekBar)
-        binding.seekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                if (isLandScapeMode) {
-                    binding.mVideoSurfaceViewNoneLandScape.seekTo(seekBar.progress * 1000)
-                    binding.mVideoSurfaceViewNoneLandScape.start()
-                    binding.videoPlayBtnLandScape.viewGone()
-                    binding.videoPauseBtnLandScape.viewVisible()
-
-                } else {
-                    binding.mVideoSurfaceViewNone.seekTo(seekBar.progress * 1000)
-                    binding.mVideoSurfaceViewNone.start()
-                    binding.exoPlay.viewGone()
-                    binding.exoPause.viewVisible()
-                }
-
-                if (topBlur) {
-                    if (mediaPlayerTop != null) {
-                        mediaPlayerTop?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerTop?.start()
-                    }
-                } else if (bottomBlur) {
-                    if (mediaPlayerBottom != null) {
-                        mediaPlayerBottom?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerBottom?.start()
-                    }
-
-                } else if (fullBlur) {
-                    if (mediaPlayerFull != null) {
-                        mediaPlayerFull?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerFull?.start()
-                    }
-                }
-                runOnUiThread(updateSeekBar)
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar) {
-                handler?.removeCallbacks(updateProgressAction)
-                if (isLandScapeMode) {
-                    binding.mVideoSurfaceViewNoneLandScape.pause()
-                } else {
-                    binding.mVideoSurfaceViewNone.pause()
-                }
-                if (topBlur) {
-                    mediaPlayerTop?.pause()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.pause()
-
-                } else if (fullBlur) {
-                    mediaPlayerFull?.pause()
-                }
-            }
-
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    if (isLandScapeMode) {
-                        binding.mVideoSurfaceViewNoneLandScape.seekTo(progress * 1000)
+                    if (getFullBlur() != "") {
+                        isBlurred = true
+                        nonBlur = false
+                        binding.cvTopBlur.isEnabled = true
+                        binding.cvBottomBlur.isEnabled = true
+                        binding.cvFullBlur.isEnabled = false
+                        binding.blurLinearlayout.viewVisible()
+                        releasePlayer()
+                        finalVideo = ""
+                        setExoPlayer(getFullBlur())
+                        enableShareAndSave()
                     } else {
-                        binding.mVideoSurfaceViewNone.seekTo(progress * 1000)
-                    }
-
-                }
-
-                if (topBlur) {
-                    if (mediaPlayerTop != null && fromUser) {
-                        mediaPlayerTop?.seekTo(progress * 1000)
-                    }
-                } else if (bottomBlur) {
-                    if (mediaPlayerBottom != null && fromUser) {
-                        mediaPlayerBottom?.seekTo(progress * 1000)
-                    }
-
-                } else if (fullBlur) {
-                    if (mediaPlayerFull != null && fromUser) {
-                        mediaPlayerFull?.seekTo(progress * 1000)
-
+                        fullBlurCommand(originalPath!!, fullBlurOutput, type, radius)
                     }
                 }
-            }
-        })
-    }
-
-    private fun setPlayerSeekBarForLandScape() {
-        mHandler = Handler(Looper.getMainLooper())
-        mHandler?.post(updateProgressActionForLandScape)
-
-        val updateSeekBar: Runnable = object : Runnable {
-            override fun run() {
-                var mCurrentPosition: Int? = null
-                mCurrentPosition = binding.mVideoSurfaceViewNoneLandScape.currentPosition
-                binding.seekbarForLandScape.max =
-                    binding.mVideoSurfaceViewNoneLandScape.duration / 1000
-                binding.seekbarForLandScape.progress = mCurrentPosition / 1000
-                binding.seekbarForLandScape.postDelayed(this, 500)
-
             }
         }
-        runOnUiThread(updateSeekBar)
-        binding.seekbarForLandScape.setOnSeekBarChangeListener(object :
-            SeekBar.OnSeekBarChangeListener {
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                binding.mVideoSurfaceViewNoneLandScape.seekTo(seekBar.progress * 1000)
-                binding.mVideoSurfaceViewNoneLandScape.start()
-                binding.videoPlayBtnLandScape.viewGone()
-                binding.videoPauseBtnLandScape.viewVisible()
-
-                if (topBlur) {
-                    if (mediaPlayerTop != null) {
-                        mediaPlayerTop?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerTop?.start()
-                    }
-                } else if (bottomBlur) {
-                    if (mediaPlayerBottom != null) {
-                        mediaPlayerBottom?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerBottom?.start()
-                    }
-
-                } else if (fullBlur) {
-                    if (mediaPlayerFull != null) {
-                        mediaPlayerFull?.seekTo(seekBar.progress * 1000)
-                        mediaPlayerFull?.start()
-                    }
-                }
-                runOnUiThread(updateSeekBar)
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar) {
-                handler?.removeCallbacks(updateProgressActionForLandScape)
-                binding.mVideoSurfaceViewNoneLandScape.pause()
-
-                if (topBlur) {
-                    mediaPlayerTop?.pause()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.pause()
-
-                } else if (fullBlur) {
-                    mediaPlayerFull?.pause()
-                }
-            }
-
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    binding.mVideoSurfaceViewNoneLandScape.seekTo(progress * 1000)
-                }
-
-                if (topBlur) {
-                    if (mediaPlayerTop != null && fromUser) {
-                        mediaPlayerTop?.seekTo(progress * 1000)
-                    }
-                } else if (bottomBlur) {
-                    if (mediaPlayerBottom != null && fromUser) {
-                        mediaPlayerBottom?.seekTo(progress * 1000)
-                    }
-
-                } else if (fullBlur) {
-                    if (mediaPlayerFull != null && fromUser) {
-                        mediaPlayerFull?.seekTo(progress * 1000)
-
-                    }
-                }
-            }
-        })
     }
 
-/* These function is command of topBlur
-*  https://github.com/tanersener/mobile-ffmpeg
-*  */
-
-    private fun topBlurCommand(
-        input: String, output: String, radius: Int, blurType: String, buttonType: String
-    ) {
+    /* These function is command of topBlur
+    *  https://github.com/tanersener/mobile-ffmpeg
+    *  */
+    private fun topBlurCommand(input: String, output: String, type: Int, radius: Int) {
         getHeight(input)
         val cmd = arrayOf(
             "-y",
@@ -1862,15 +1193,40 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
             output,
             "-hide_banner"
         )
-        execFfmpegBinaryForBlur(cmd, output, blurType, buttonType)
+        execFfmpegBinaryForBlur(cmd, output, type, radius)
     }
+
+    private fun topBlurCommandWithOriginalPath(radius: Int) {
+        getHeight(originalPath!!)
+        val cmd2 = arrayOf(
+            "-y",
+            "-i",
+            originalPath!!,
+            "-filter_complex",
+            "[0:v]crop=" + videoWidth + ":" + videoHeight / 2 + ":" + videoHeight % 2 + ":" + 0 + ",gblur=$radius[blurred];[0:v][blurred]overlay=" + videoHeight % 2 + ":" + 0 + "[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "0:a?",
+            "-c:a",
+            "copy",
+            "-crf",
+            "25",
+            "-b:v",
+            "8000k",
+            "-preset",
+            "ultrafast",
+            secondOutputForBlur,
+            "-hide_banner"
+        )
+        execFfmpegBinaryForBlurForOriginalVideoPath(cmd2, secondOutputForBlur)
+    }
+
 
     /* These function is command of bottomBlur
     *  https://github.com/tanersener/mobile-ffmpeg
     *  */
-    private fun bottomBlurCommand(
-        input: String, output: String, radius: Int, blurType: String, buttonType: String
-    ) {
+    private fun bottomBlurCommand(input: String, output: String, type: Int, radius: Int) {
         getHeight(input)
         val cmd = arrayOf(
             "-y",
@@ -1893,23 +1249,47 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
             output,
             "-hide_banner"
         )
-        execFfmpegBinaryForBlur(cmd, output, blurType, buttonType)
+        execFfmpegBinaryForBlur(cmd, output, type, radius)
 
+    }
+
+    private fun bottomBlurCommandWithOriginalInput(radius: Int) {
+        getHeight(originalPath!!)
+        val cmd2 = arrayOf(
+            "-y",
+            "-i",
+            originalPath!!,
+            "-filter_complex",
+            "[0:v]crop=" + videoWidth + ":" + videoHeight / 2 + ":" + 0 + ":" + videoHeight / 2 + ",gblur=$radius[blurred];[0:v][blurred]overlay=" + 0 + ":" + videoHeight / 2 + "[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "0:a?",
+            "-c:a",
+            "copy",
+            "-crf",
+            "25",
+            "-b:v",
+            "8000k",
+            "-preset",
+            "ultrafast",
+            secondOutputForBlur,
+            "-hide_banner"
+        )
+        execFfmpegBinaryForBlurForOriginalVideoPath(cmd2, secondOutputForBlur)
     }
 
     /* These function is command of fullBlur
     *  https://github.com/tanersener/mobile-ffmpeg
     *  */
-    private fun fullBlurCommand(
-        input: String, output: String, radius: Int, blurType: String, buttonType: String
-    ) {
+    private fun fullBlurCommand(input: String, output: String, type: Int, radius: Int) {
         getHeight(input)
         val cmd = arrayOf(
             "-y",
             "-i",
             input,
             "-filter_complex",
-            "[0:v]crop=$videoWidth:$videoHeight:0:0,gblur=$radius[blurred];[0:v][blurred]overlay=0:0[v]",
+            "[0:v]crop=" + videoWidth + ":" + videoHeight + ":" + 0 + ":" + 0 + ",gblur=$radius[blurred];[0:v][blurred]overlay=" + 0 + ":" + 0 + "[v]",
             "-map",
             "[v]",
             "-map",
@@ -1925,80 +1305,116 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
             output,
             "-hide_banner"
         )
-        execFfmpegBinaryForBlur(cmd, output, blurType, buttonType)
+        execFfmpegBinaryForBlur(cmd, output, type, radius)
 
+    }
+
+    private fun fullBlurCommandWithOriginalInput(radius: Int) {
+        getHeight(originalPath!!)
+        val cmd2 = arrayOf(
+            "-y",
+            "-i",
+            originalPath!!,
+            "-filter_complex",
+            "[0:v]crop=" + videoWidth + ":" + videoHeight + ":" + 0 + ":" + 0 + ",gblur=$radius[blurred];[0:v][blurred]overlay=" + 0 + ":" + 0 + "[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "0:a?",
+            "-c:a",
+            "copy",
+            "-crf",
+            "25",
+            "-b:v",
+            "8000k",
+            "-preset",
+            "ultrafast",
+            secondOutputForBlur,
+            "-hide_banner"
+        )
+        execFfmpegBinaryForBlurForOriginalVideoPath(cmd2, secondOutputForBlur)
     }
 
     /* This function is actually execution of blur commands */
     private fun execFfmpegBinaryForBlur(
-        command: Array<String>, outPut: String, blurType: String, buttonType: String
+        command: Array<String>, outPut: String, type: Int, radius: Int
     ) {
-
-        when (blurType) {
-            "topBlur" -> {
-                binding.apply {
-
-
-                    if (isLandScapeMode) {
-                        videoPauseBtnLandScape.viewGone()
-                        videoPlayBtnLandScape.viewVisible()
-                        mVideoSurfaceViewNoneLandScape.pause()
-                    } else {
-                        exoPause.viewGone()
-                        exoPlay.viewVisible()
-                        mVideoSurfaceViewNone.pause()
-                    }
-
-                    mediaPlayerTop?.pause()
-                }
-            }
-            "bottomBlur" -> {
-                binding.apply {
-                    if (isLandScapeMode) {
-                        videoPauseBtnLandScape.viewGone()
-                        videoPlayBtnLandScape.viewVisible()
-                        mVideoSurfaceViewNoneLandScape.pause()
-                    } else {
-                        exoPause.viewGone()
-                        exoPlay.viewVisible()
-                        mVideoSurfaceViewNone.pause()
-                    }
-                    mediaPlayerBottom?.pause()
-                }
-            }
-            "fullBlur" -> {
-                binding.apply {
-
-                    if (isLandScapeMode) {
-                        videoPauseBtnLandScape.viewGone()
-                        videoPlayBtnLandScape.viewVisible()
-                        mVideoSurfaceViewNoneLandScape.pause()
-                    } else {
-                        exoPause.viewGone()
-                        exoPlay.viewVisible()
-                        mVideoSurfaceViewNone.pause()
-                    }
-                    mediaPlayerFull?.pause()
-                }
-            }
-        }
-        setProgressDialogue("blur")
-        enableStatisticsCallback("")
+        showDialog()
+        exoPlayer?.pause()
+        enableStatisticsCallback()
         lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
             val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
                 when (returnCode) {
                     Config.RETURN_CODE_SUCCESS -> {
-                        dialog.dismiss()
-                        if (buttonType == "save") {
-                            setSave(outPut, "blur")
-                        } else if (buttonType == "share") {
-                            setShare(outPut)
+                        isBlurred = true
+                        dismissDialog()
+                        releasePlayer()
+                        finalVideo = ""
+                        outputForBlurredVideo = outPut
+                        nonBlur = false
+                        setExoPlayer(outPut)
+                        binding.blurLinearlayout.viewVisible()
+                        enableShareAndSave()
+                        when (type) {
+                            0 -> {
+                                setTopBlur(outPut)
+                                binding.cvTopBlur.isEnabled = false
+                                binding.cvBottomBlur.isEnabled = true
+                                binding.cvFullBlur.isEnabled = true
+                                topBlur = true
+                                bottomBlur = false
+                                fullBlur = false
+                                topSeekBar = radius
+                                if (isMuted) {
+                                    mTopBlur = true
+                                    mBottomBlur = false
+                                    mFullBlur = false
+                                    blurAndMuted = true
+                                    mradius = radius
+                                }
+                            }
+                            1 -> {
+                                setBottomBlurPref(outPut)
+                                binding.cvTopBlur.isEnabled = true
+                                binding.cvBottomBlur.isEnabled = false
+                                binding.cvFullBlur.isEnabled = true
+                                bottomSeekBar = radius
+                                topBlur = false
+                                bottomBlur = true
+                                fullBlur = false
+                                if (isMuted) {
+                                    mTopBlur = false
+                                    mBottomBlur = true
+                                    mFullBlur = false
+                                    blurAndMuted = true
+                                    mradius = radius
+                                    bottomBlur = true
+                                }
+                            }
+                            2 -> {
+                                binding.cvTopBlur.isEnabled = true
+                                binding.cvBottomBlur.isEnabled = true
+                                binding.cvFullBlur.isEnabled = false
+                                topBlur = false
+                                bottomBlur = false
+                                fullBlur = true
+                                fullSeekBar = radius
+                                setFullBlurPref(outPut)
+                                if (isMuted) {
+                                    mTopBlur = false
+                                    mBottomBlur = false
+                                    mFullBlur = true
+                                    blurAndMuted = true
+                                    mradius = radius
+                                    fullBlur = true
+                                }
+                            }
                         }
-
                     }
                     Config.RETURN_CODE_CANCEL -> {
                         isBlurred = false
-//                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
                         Log.e(Config.TAG, "Async command execution canceled by user")
                     }
                 }
@@ -2008,20 +1424,89 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         }
     }
 
+    /* This function is execute blur command with actual path or default that we get from gallery so that we can use this blur video when user want to remove mute and distortion */
+    private fun execFfmpegBinaryForBlurForOriginalVideoWithoutBlurForSoundDistortion(
+        command: Array<String>, ourPut: String
+    ) {
+        showDialog()
+        exoPlayer?.pause()
+        enableStatisticsCallback()
+        lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
+            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
+                when (returnCode) {
+                    Config.RETURN_CODE_SUCCESS -> {
+                        dismissDialog()
+                        blurAndMuteVideo = ourPut
 
+                        val folder = File(
+                            Environment.getExternalStorageDirectory().toString() + "/extractAudio"
+                        )
+                        if (!folder.exists()) {
+                            folder.mkdir()
+                        }
+
+                        val outputForExtractAudio: String =
+                            getExternalFilesDir(Environment.DIRECTORY_DCIM)?.absolutePath + "/extract_audio_output.mp3"
+
+                        val cmd = arrayOf(
+                            "-y", "-i", // input path
+                            blurAndMuteVideo, "-f",  // output format
+                            "wav", "-ab",  // encode speed
+                            "64k", "-vn",  // dont want video
+                            outputForExtractAudio // output path
+                        )
+                        execFfmpegForExtractVoiceFromVideo(
+                            cmd, outputForExtractAudio, blurAndMuteVideo
+                        )
+                    }
+                    Config.RETURN_CODE_CANCEL -> {
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Log.e(Config.TAG, "Async command execution canceled by user")
+                    }
+                    else -> {
+
+                    }
+                }
+            }
+
+            progressId = executionId
+        }
+    }
+
+    /* This function is execute blur command with actual path or default that we get from gallery so that we can use this blur video when user want to remove mute and distortion */
+    private fun execFfmpegBinaryForBlurForOriginalVideoPath(
+        command: Array<String>, ourPut: String
+    ) {
+        lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
+            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
+                when (returnCode) {
+                    Config.RETURN_CODE_SUCCESS -> {
+                        isBlurAndMuted = true
+                        newVideo = ourPut
+                    }
+                    Config.RETURN_CODE_CANCEL -> {
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Log.e(Config.TAG, "Async command execution canceled by user")
+                    }
+                }
+            }
+            progressId = executionId
+        }
+    }
+
+    //fixme
     /* This function is mute the video sound */
     private fun muteVideoCommands() {
-        if (isBlurred) {
-//            if (mutedVideo != "") {
-//                resetPlayerForMute(mutedVideo)
-//            } else {
-//
-//            }
-            muteCommand(fullOutPut)
+        if (isBlurred && isDistortion) {
+            muteCommand(outputForBlurredVideo)
+        } else if (isBlurred) {
+            muteCommand(outputForBlurredVideo)
         } else if (isDistortion) {
-            muteCommand(distortedVideo)
+            muteCommand(finalOutput)
         } else {
-            muteCommand(fullOutPut)
+            muteCommand(originalPath!!)
         }
     }
 
@@ -2041,56 +1526,52 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
     private fun execFfmpegBinaryForMuteAudio(
         command: Array<String>, outPut: String
     ) {
+        showDialog()
+        exoPlayer?.pause()
+        enableStatisticsCallback()
         lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
             val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
                 when (returnCode) {
                     Config.RETURN_CODE_SUCCESS -> {
-                        if (isInitialBlurValue) {
-                            finalMuteVideo = outPut
-                            isInitialBlurValue = false
-                        } else {
-                            isShowBackDialogue = true
-                            finalVideo = ""
-                            enableShareAndSave()
-                            mutedVideo = outPut
-                            isMuted = true
-                            isDistortion = false
-                            binding.apply {
-                                buttonLayouts.apply {
-                                    buttonRemoveAudio.isEnabled = false
-                                    buttonRemoveDistortion.isEnabled = true
-                                }
-                                ivNoEffect.apply {
-                                    setImageDrawable(
-                                        ContextCompat.getDrawable(
-                                            this@VideoEditActivity, R.drawable.ic_no_effect
-                                        )
-                                    )
-                                    setColorFilter(
-                                        ContextCompat.getColor(
-                                            context, R.color.white
-                                        )
-                                    )
-                                }
+                        finalVideo = ""
+                        dismissDialog()
+                        releasePlayer()
+                        setExoPlayer(outPut)
+                        enableShareAndSave()
+                        if (!isBlurred) mutedVideo = outPut
+                        isMuted = true
+                        isDistortion = false
+                        binding.buttonLayouts.buttonRemoveAudio.isEnabled = false
+                        binding.buttonLayouts.buttonRemoveDistortion.isEnabled = true
 
-                                tvNoEffect.setTextColor(
-                                    ContextCompat.getColor(
-                                        this@VideoEditActivity, R.color.white
-                                    )
-                                )
-                                buttonNoEffect.apply {
-                                    background = ContextCompat.getDrawable(
-                                        this@VideoEditActivity,
-                                        R.drawable.ss_corner_round_white_blue_corener
-                                    )
-                                    isEnabled = true
-                                }
+                        binding.buttonNoEffect.background = ContextCompat.getDrawable(
+                            this@VideoEditActivity, R.drawable.ss_corner_round_white_blue_corener
+                        )
+                        binding.buttonNoEffect.isEnabled = true
+                        if (isBlurred) {
+                            val file2 =
+                                File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+                            if (!file2.exists()) {
+                                file2.mkdirs()
                             }
-                            resetPlayerForMute(mutedVideo)
+                            val downloadFile2 =
+                                File(file2, "AUDIOREMOVE" + System.currentTimeMillis() + ".mp4")
+                            val outPutForMute2 = downloadFile2.absolutePath
+
+                            val cmd2 = arrayOf(
+                                "-i",
+                                getNewPath(originalPath!!),
+                                "-c",
+                                "copy",
+                                "-an",
+                                outPutForMute2
+                            )
+                            execFfmpegBinaryForMuteAudioWithOriginalInput(cmd2, outPutForMute2)
                         }
                     }
                     Config.RETURN_CODE_CANCEL -> {
-//                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
                         Log.e(Config.TAG, "Async command execution canceled by user")
                     }
                 }
@@ -2099,9 +1580,28 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         }
     }
 
+    /* This function is execute the mute video command with original Path that came from gallery */
+    private fun execFfmpegBinaryForMuteAudioWithOriginalInput(
+        command: Array<String>, outPut: String
+    ) {
+        Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
+        val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
+            when (returnCode) {
+                Config.RETURN_CODE_SUCCESS -> {
+                    mutedVideo = outPut
+                }
+                Config.RETURN_CODE_CANCEL -> {
+                    Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                    Log.e(Config.TAG, "Async command execution canceled by user")
+                }
+            }
+        }
+        progressId = executionId
+
+    }
 
     /* This function is extract the audio or wav file from video or mp4. */
-    private fun audioExtractCommand(path: String) {
+    private fun audioExtractCommand() {
         folder = File(Environment.getExternalStorageDirectory().toString() + "/extractAudio")
         if (!folder!!.exists()) {
             folder!!.mkdir()
@@ -2109,16 +1609,145 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         val outputForExtractAudio: String =
             getExternalFilesDir(Environment.DIRECTORY_DCIM)?.absolutePath + "/extract_audio_output.mp3"
 
-        val cmd = arrayOf(
-            "-y", "-i", // input path
-            path, "-f",  // output format
-            "wav", "-ab",  // encode speed
-            "64k", "-vn",  // dont want video
-            outputForExtractAudio // output path
-        )
-        execFfmpegForExtractVoiceFromVideo(
-            cmd, outputForExtractAudio, path
-        )
+        if (blurAndMuted) {
+            when {
+                mTopBlur -> {
+                    getHeight(originalPath!!)
+                    val cmd = arrayOf(
+                        "-y",
+                        "-i",
+                        getNewPath(originalPath!!),
+                        "-filter_complex",
+                        "[0:v]crop=" + videoWidth + ":" + videoHeight / 2 + ":" + videoHeight % 2 + ":" + 0 + ",gblur=$mradius[blurred];[0:v][blurred]overlay=" + videoHeight % 2 + ":" + 0 + "[v]",
+                        "-map",
+                        "[v]",
+                        "-map",
+                        "0:a?",
+                        "-c:a",
+                        "copy",
+                        "-crf",
+                        "25",
+                        "-b:v",
+                        "8000k",
+                        "-preset",
+                        "ultrafast",
+                        outPutForMutedBlurredVideo,
+                        "-hide_banner"
+                    )
+                    execFfmpegBinaryForBlurForOriginalVideoWithoutBlurForSoundDistortion(
+                        cmd, outPutForMutedBlurredVideo
+                    )
+                }
+                mBottomBlur -> {
+                    getHeight(originalPath!!)
+                    val cmd = arrayOf(
+                        "-y",
+                        "-i",
+                        getNewPath(originalPath!!),
+                        "-filter_complex",
+                        "[0:v]crop=" + videoWidth + ":" + videoHeight / 2 + ":" + 0 + ":" + videoHeight / 2 + ",gblur=$mradius[blurred];[0:v][blurred]overlay=" + 0 + ":" + videoHeight / 2 + "[v]",
+                        "-map",
+                        "[v]",
+                        "-map",
+                        "0:a?",
+                        "-c:a",
+                        "copy",
+                        "-crf",
+                        "25",
+                        "-b:v",
+                        "8000k",
+                        "-preset",
+                        "ultrafast",
+                        outPutForMutedBlurredVideo,
+                        "-hide_banner"
+                    )
+                    execFfmpegBinaryForBlurForOriginalVideoWithoutBlurForSoundDistortion(
+                        cmd, outPutForMutedBlurredVideo
+                    )
+                }
+                else -> {
+                    getHeight(originalPath!!)
+                    val cmd = arrayOf(
+                        "-y",
+                        "-i",
+                        getNewPath(originalPath!!),
+                        "-filter_complex",
+                        "[0:v]crop=" + videoWidth + ":" + videoHeight + ":" + 0 + ":" + 0 + ",gblur=$mradius[blurred];[0:v][blurred]overlay=" + 0 + ":" + 0 + "[v]",
+                        "-map",
+                        "[v]",
+                        "-map",
+                        "0:a?",
+                        "-c:a",
+                        "copy",
+                        "-crf",
+                        "25",
+                        "-b:v",
+                        "8000k",
+                        "-preset",
+                        "ultrafast",
+                        outPutForMutedBlurredVideo,
+                        "-hide_banner"
+                    )
+                    execFfmpegBinaryForBlurForOriginalVideoWithoutBlurForSoundDistortion(
+                        cmd, outPutForMutedBlurredVideo
+                    )
+                }
+            }
+
+            val cmd1 = arrayOf(
+                "-y", "-i", // input path
+                getNewPath(originalPath!!), "-f",  // output format
+                "wav", "-ab",  // encode speed
+                "64k", "-vn",  // dont want video
+                outputForExtractAudio // output path
+            )
+            execFfmpegForExtractVoiceFromVideoWithOriginalVideoOrPath(
+                cmd1, outputForExtractAudio, getNewPath(originalPath!!)
+            )
+        } else if (nonBlur) {
+            val cmd = arrayOf(
+                "-y", "-i", // input path
+                getNewPath(originalPath!!), "-f",  // output format
+                "wav", "-ab",  // encode speed
+                "64k", "-vn",  // dont want video
+                outputForExtractAudio // output path
+            )
+            execFfmpegForExtractVoiceFromVideo(
+                cmd, outputForExtractAudio, getNewPath(originalPath!!)
+            )
+        } else if (isBlurred) {
+            val cmd = arrayOf(
+                "-y", "-i", // input path
+                outputForBlurredVideo, "-f",  // output format
+                "wav", "-ab",  // encode speed
+                "64k", "-vn",  // dont want video
+                outputForExtractAudio // output path
+            )
+
+            val cmd1 = arrayOf(
+                "-y", "-i", // input path
+                getNewPath(originalPath!!), "-f",  // output format
+                "wav", "-ab",  // encode speed
+                "64k", "-vn",  // dont want video
+                outputForExtractAudio // output path
+            )
+
+            execFfmpegForExtractVoiceFromVideo(cmd, outputForExtractAudio, outputForBlurredVideo)
+            execFfmpegForExtractVoiceFromVideoWithOriginalVideoOrPath(
+                cmd1, outputForExtractAudio, getNewPath(originalPath!!)
+            )
+        } else {
+            val cmd = arrayOf(
+                "-y", "-i", // input path
+                getNewPath(originalPath!!), "-f",  // output format
+                "wav", "-ab",  // encode speed
+                "64k", "-vn",  // dont want video
+                outputForExtractAudio // output path
+            )
+            execFfmpegForExtractVoiceFromVideo(
+                cmd, outputForExtractAudio, getNewPath(originalPath!!)
+            )
+        }
     }
 
     /* This function is execute mp4 to wav command */
@@ -2126,25 +1755,50 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         command: Array<String>, strAudioPath: String, inputForAttachVoice: String
     ) {
         lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
             val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
                 when (returnCode) {
                     Config.RETURN_CODE_SUCCESS -> {
-                        if (isLandScapeMode) {
-                            audioChangeLayoutForLandScape.viewVisible()
-                        } else {
-                            audioChangeLayout.viewVisible()
-                        }
-
+                        enableShareAndSave()
+                        audioChangeLayout.viewVisible()
                         doSoundTouchProcessing(strAudioPath, inputForAttachVoice)
                     }
                     Config.RETURN_CODE_CANCEL -> {
                         isDistortion = false
-//                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
                         Log.e(Config.TAG, "Async command execution canceled by user")
                     }
+                    else -> {
 
+                    }
                 }
             }
+            progressId = executionId
+        }
+    }
+
+    /* This function is execute to extract audio or mp3 from mp4 with original Video */
+    private fun execFfmpegForExtractVoiceFromVideoWithOriginalVideoOrPath(
+        command: Array<String>, strAudioPath: String, inputForAttachVoice: String
+    ) {
+        lifecycleScope.launch {
+            Log.d(ContentValues.TAG, "Started command : ffmpeg " + command.contentToString())
+            val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
+                when (returnCode) {
+                    Config.RETURN_CODE_SUCCESS -> {
+                        doSoundTouchProcessingWithOriginalVideo(strAudioPath, inputForAttachVoice)
+                    }
+                    Config.RETURN_CODE_CANCEL -> {
+                        isDistortion = false
+                        Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                        Log.e(Config.TAG, "Async command execution canceled by user")
+                    }
+                    else -> {
+
+                    }
+                }
+            }
+
             progressId = executionId
         }
     }
@@ -2152,10 +1806,8 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
     /*  Function that does the SoundTouch processing */
     private fun doSoundTouchProcessing(input: String, inputForAttachVoice: String): Long {
         val st = SoundTouch()
-        st.apply {
-            setTempo(1f)
-            setPitchSemiTones(6f)
-        }
+        st.setTempo(1f)
+        st.setPitchSemiTones(6f)
         val extortedAudioOutput: String =
             getExternalFilesDir(Environment.DIRECTORY_DCIM)?.absolutePath + "/pitch_change_output.mp3"
         val res = st.processFile(input, extortedAudioOutput)
@@ -2190,107 +1842,116 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
 
         execFfmpegForAttachAudioWithVideo(cmd, finalOutput)
         if (res != 0) {
-//            Toast.makeText(this, "Failure: $err", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Failure: $err", Toast.LENGTH_SHORT).show()
             return -1L
         }
         return 0L
     }
 
+    /*  Function that does the SoundTouch processing with original video input only.
+    Source Url:
+    https://github.com/qingmei2/soundtouch-android
+*/
+    private fun doSoundTouchProcessingWithOriginalVideo(
+        input: String, inputForAttachVoice: String
+    ): Long {
+        val st = SoundTouch()
+        st.setTempo(1f)
+        st.setPitchSemiTones(6f)
+        val extortedAudioOutput: String =
+            getExternalFilesDir(Environment.DIRECTORY_DCIM)?.absolutePath + "/pitch_change_output.mp3"
+
+        val res = st.processFile(input, extortedAudioOutput)
+        val folder = File(Environment.getExternalStorageDirectory().toString() + "/ExtractedVideos")
+        if (!folder.exists()) {
+            folder.mkdir()
+        }
+        val file1 =
+            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
+        if (!file1.exists()) {
+            file1.mkdirs()
+        }
+        val downloadFile = File(file1, generateBlurName() + ".mp4")
+
+        finalOutput = downloadFile.absolutePath
+
+        val cmd = arrayOf(
+            "-i",
+            inputForAttachVoice,
+            "-i",
+            extortedAudioOutput,
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-shortest",
+            finalOutput
+        )
+
+        execFfmpegForAttachAudioWithVideoWithOriginalInput(cmd, finalOutput)
+        if (res != 0) {
+            Toast.makeText(this, "Failure: $err", Toast.LENGTH_SHORT).show()
+            return -1L
+        }
+        return 0L
+    }
 
     /*  Function that attach the distorted voice to video again */
     private fun execFfmpegForAttachAudioWithVideo(
         command: Array<String>, distortedFilePath: String
     ) {
+        if (blurAndMuted) {
+            showDialog()
+            exoPlayer?.pause()
+            enableStatisticsCallback()
+        }
 
         val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
             when (returnCode) {
                 Config.RETURN_CODE_SUCCESS -> {
+                    dismissDialog()
+                    releasePlayer()
+                    finalVideo = ""
+                    setExoPlayer(distortedFilePath)
+                    isDistortion = true
+                    isMuted = false
+                    audioDistortion.viewVisible()
+                    audioRemove.viewGone()
+                    enableShareAndSave()
+                    binding.buttonNoEffect.background = ContextCompat.getDrawable(
+                        this@VideoEditActivity, R.drawable.ss_corner_round_white_blue_corener
+                    )
 
-                    if (isInitialBlurValueDistortion) {
-                        isInitialBlurValueDistortion = false
-                        finalDistortedVideo = distortedFilePath
-                    } else {
-                        isShowBackDialogue = true
-                        finalVideo = ""
-                        isDistortion = true
-                        isMuted = false
-                        if (isLandScapeMode) {
-                            audioDistortionForLandScape.viewVisible()
-                            audioRemoveForLandScape.viewGone()
-                        } else {
-                            audioDistortion.viewVisible()
-                            audioRemove.viewGone()
-                        }
-
-                        enableShareAndSave()
-                        binding.apply {
-                            buttonNoEffect.apply {
-                                background = ContextCompat.getDrawable(
-                                    this@VideoEditActivity,
-                                    R.drawable.ss_corner_round_white_blue_corener
-                                )
-                                isEnabled = true
-                            }
-                            buttonLayouts.apply {
-                                buttonRemoveAudio.isEnabled = true
-                                buttonRemoveDistortion.isEnabled = false
-                            }
-                            ivNoEffect.apply {
-                                setImageDrawable(
-                                    ContextCompat.getDrawable(
-                                        this@VideoEditActivity, R.drawable.ic_no_effect
-                                    )
-                                )
-                                setColorFilter(
-                                    ContextCompat.getColor(
-                                        context, R.color.white
-                                    )
-                                )
-                            }
-
-                            tvNoEffect.setTextColor(
-                                ContextCompat.getColor(
-                                    this@VideoEditActivity, R.color.white
-                                )
-                            )
-
-                            resetAudioButtonItems()
-                            buttonLayouts.buttonRemoveDistortion.background =
-                                ContextCompat.getDrawable(
-                                    this@VideoEditActivity, R.drawable.ss_corner_round_light_blue
-                                )
-
-                            buttonLayouts.ivAddDistortion.apply {
-                                setImageDrawable(
-                                    ContextCompat.getDrawable(
-                                        context, R.drawable.ic_disortion
-                                    )
-                                )
-                                setColorFilter(
-                                    ContextCompat.getColor(
-                                        context, R.color.white
-                                    )
-                                )
-                            }
-
-                            buttonLayouts.tvAddDistortion.setTextColor(
-                                ContextCompat.getColor(
-                                    this@VideoEditActivity, R.color.white
-                                )
-                            )
-
-
-                        }
-                        distortedVideo = distortedFilePath
-                        resetPlayerForMute(distortedFilePath)
-                    }
-
-
-//                    resetPlayer(distortedFilePath)
+                    binding.buttonNoEffect.isEnabled = true
+                    if (!isBlurred) finalDistortedVideo = distortedFilePath
+                    binding.buttonLayouts.buttonRemoveAudio.isEnabled = true
+                    binding.buttonLayouts.buttonRemoveDistortion.isEnabled = false
                 }
                 Config.RETURN_CODE_CANCEL -> {
                     isDistortion = false
-//                    Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
+                    Log.e(Config.TAG, "Async command execution canceled by user")
+                }
+            }
+        }
+        progressId = executionId
+    }
+
+    /*  Function that attach the distorted voice with original video */
+    private fun execFfmpegForAttachAudioWithVideoWithOriginalInput(
+        command: Array<String>, distortedFilePath: String
+    ) {
+        val executionId: Long = FFmpeg.executeAsync(command) { _, returnCode ->
+            when (returnCode) {
+                Config.RETURN_CODE_SUCCESS -> {
+                    finalDistortedVideo = distortedFilePath
+                }
+                Config.RETURN_CODE_CANCEL -> {
+                    Toast.makeText(this@VideoEditActivity, "Fail", Toast.LENGTH_SHORT).show()
                     Log.e(Config.TAG, "Async command execution canceled by user")
                 }
             }
@@ -2299,216 +1960,8 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
     }
 
     /* Save video to gallery by creating folder*/
-    private fun saveVideo() {
-        if (isBlurred) {
-            if (topBlur) {
-                if (isLargeSizeVideo) {
-                    if (isMuted) {
-                        topBlurCommand(
-                            finalMuteVideo,
-                            topBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "topBlur",
-                            "save"
-                        )
-                    } else if (isDistortion) {
-                        topBlurCommand(
-                            finalDistortedVideo,
-                            topBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "topBlur",
-                            "save"
-                        )
-                    } else {
-                        topBlurCommand(
-                            compressFile,
-                            topBlurFinalOutput,
-                            seekBarForSaveVideo, "topBlur", "save"
-                        )
-
-                    }
-                } else {
-                    if (isMuted) {
-                        topBlurCommand(
-                            mutedVideo, topBlurFinalOutput, seekBarForSaveVideo, "topBlur", "save"
-                        )
-                    } else if (isDistortion) {
-                        topBlurCommand(
-                            distortedVideo,
-                            topBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "topBlur",
-                            "save"
-                        )
-                    } else {
-                        topBlurCommand(
-                            originalPath!!,
-                            topBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "topBlur",
-                            "save"
-                        )
-                    }
-                }
-            } else if (bottomBlur) {
-                if (isLargeSizeVideo) {
-                    if (isMuted) {
-                        bottomBlurCommand(
-                            finalMuteVideo,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-                    } else if (isDistortion) {
-                        bottomBlurCommand(
-                            finalDistortedVideo,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-                    } else {
-                        bottomBlurCommand(
-                            compressFile,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-
-                    }
-                } else {
-                    if (isMuted) {
-                        bottomBlurCommand(
-                            mutedVideo,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-                    } else if (isDistortion) {
-                        bottomBlurCommand(
-                            distortedVideo,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-                    } else {
-                        bottomBlurCommand(
-                            originalPath!!,
-                            bottomBlurFinalOutput,
-                            seekBarForSaveVideo,
-                            "bottomBlur",
-                            "save"
-                        )
-                    }
-                }
-
-
-            } else if (fullBlur) {
-                if (isLargeSizeVideo) {
-                    if (isMuted) {
-                        fullBlurCommand(
-                            finalMuteVideo, fullBlurOutput, seekBarForSaveVideo, "fullBlur", "save"
-                        )
-                    } else if (isDistortion) {
-                        fullBlurCommand(
-                            finalDistortedVideo,
-                            fullBlurOutput,
-                            seekBarForSaveVideo,
-                            "fullBlur",
-                            "save"
-                        )
-                    } else {
-                        fullBlurCommand(
-                            compressFile, fullBlurOutput, seekBarForSaveVideo, "fullBlur", "save"
-                        )
-                    }
-                } else {
-                    if (isMuted) {
-                        fullBlurCommand(
-                            mutedVideo, fullBlurOutput, seekBarForSaveVideo, "fullBlur", "save"
-                        )
-                    } else if (isDistortion) {
-                        fullBlurCommand(
-                            distortedVideo, fullBlurOutput, seekBarForSaveVideo, "fullBlur", "save"
-                        )
-                    } else {
-                        fullBlurCommand(
-                            originalPath!!, fullBlurOutput, seekBarForSaveVideo, "fullBlur", "save"
-                        )
-                    }
-                }
-
-            }
-
-        } else {
-            if (isLargeSizeVideo) {
-                if (isMuted) {
-                    binding.apply {
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewGone()
-                            videoPlayBtnLandScape.viewVisible()
-                            mVideoSurfaceViewNoneLandScape.pause()
-                        } else {
-                            exoPause.viewGone()
-                            exoPlay.viewVisible()
-                            mVideoSurfaceViewNone.pause()
-                        }
-                    }
-                    setSave(finalMuteVideo, "mute")
-                } else if (isDistortion) {
-                    binding.apply {
-
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewGone()
-                            videoPlayBtnLandScape.viewVisible()
-                            mVideoSurfaceViewNoneLandScape.pause()
-                        } else {
-                            exoPause.viewGone()
-                            exoPlay.viewVisible()
-                            mVideoSurfaceViewNone.pause()
-                        }
-                    }
-                    setSave(finalDistortedVideo, "distortion")
-                }
-            } else {
-                if (isMuted) {
-                    binding.apply {
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewGone()
-                            videoPlayBtnLandScape.viewVisible()
-                            mVideoSurfaceViewNoneLandScape.pause()
-                        } else {
-                            exoPause.viewGone()
-                            exoPlay.viewVisible()
-                            mVideoSurfaceViewNone.pause()
-                        }
-                    }
-                    setSave(mutedVideo, "mute")
-                } else if (isDistortion) {
-                    binding.apply {
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewGone()
-                            videoPlayBtnLandScape.viewVisible()
-                            mVideoSurfaceViewNoneLandScape.pause()
-                        } else {
-                            exoPause.viewGone()
-                            exoPlay.viewVisible()
-                            mVideoSurfaceViewNone.pause()
-                        }
-                    }
-                    setSave(distortedVideo, "distortion")
-                }
-            }
-        }
-    }
-
-    private fun setSave(finalVideo: String, type: String) {
-        isShowBackDialogue = false
-        val pathOf = finalVideo
+    private fun saveVideo(_pathOf: String) {
+        val pathOf = _pathOf
         val rootPath = File(
             File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
@@ -2521,242 +1974,72 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         val input = File(pathOf)
         val outPut1 = File(rootPath, input.name)
         moveFile(pathOf, outPut1.absolutePath)
-        setSaveDialogue(type)
-    }
+        setSaveDialogue()
 
+    }
 
     /* Set the save dialogue */
-    private fun setSaveDialogue(type: String) {
+    private fun setSaveDialogue() {
+        exoPlayer?.pause()
         val dialog = Dialog(this@VideoEditActivity)
+        dialog.setContentView(R.layout.custom_progressbar)
 
-        dialog.apply {
-            setContentView(R.layout.custom_progressbar)
-            window!!.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            val progress = findViewById<ProgressBar>(R.id.progressBar)
-            val textView = findViewById<TextView>(R.id.tv)
-            val ivDone = findViewById<ImageView>(R.id.iv_done)
-            val mHandler = Handler(Looper.getMainLooper())
+        val progress = dialog.findViewById<ProgressBar>(R.id.progressBar)
+        val textView = dialog.findViewById<TextView>(R.id.tv)
+        val ivDone = dialog.findViewById<ImageView>(R.id.iv_done)
 
-            if (type == "blur") {
-                if (topBlur) {
-                    binding.apply {
+        val mHandler = Handler()
+        var progressBarStatus = 0
 
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewVisible()
-                            videoPlayBtnLandScape.viewGone()
-                            if (mVideoSurfaceViewNoneLandScape.isPlaying) {
-                                mVideoSurfaceViewNoneLandScape.resume()
-                            } else {
-                                mVideoSurfaceViewNoneLandScape.start()
-                            }
-                        } else {
-                            exoPause.viewVisible()
-                            exoPlay.viewGone()
-                            if (mVideoSurfaceViewNone.isPlaying) {
-                                mVideoSurfaceViewNone.resume()
-                            } else {
-                                mVideoSurfaceViewNone.start()
-                            }
-                        }
-
-                        mediaPlayerTop?.start()
-                    }
-                } else if (bottomBlur) {
-                    binding.apply {
-
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewVisible()
-                            videoPlayBtnLandScape.viewGone()
-                            if (mVideoSurfaceViewNoneLandScape.isPlaying) {
-                                mVideoSurfaceViewNoneLandScape.resume()
-                            } else {
-                                mVideoSurfaceViewNoneLandScape.start()
-                            }
-                        } else {
-                            exoPause.viewVisible()
-                            exoPlay.viewGone()
-                            if (mVideoSurfaceViewNone.isPlaying) {
-                                mVideoSurfaceViewNone.resume()
-                            } else {
-                                mVideoSurfaceViewNone.start()
-                            }
-                        }
-
-                        mediaPlayerBottom?.start()
-                    }
-                } else {
-                    binding.apply {
-
-                        if (isLandScapeMode) {
-                            videoPauseBtnLandScape.viewVisible()
-                            videoPlayBtnLandScape.viewGone()
-                            if (mVideoSurfaceViewNoneLandScape.isPlaying) {
-                                mVideoSurfaceViewNoneLandScape.resume()
-                            } else {
-                                mVideoSurfaceViewNoneLandScape.start()
-                            }
-                        } else {
-                            exoPause.viewVisible()
-                            exoPlay.viewGone()
-                            if (mVideoSurfaceViewNone.isPlaying) {
-                                mVideoSurfaceViewNone.resume()
-                            } else {
-                                mVideoSurfaceViewNone.start()
-                            }
-                        }
-
-                        mediaPlayerFull?.start()
-                    }
+        Thread {
+            while (progressBarStatus < 100) {
+                // sleeping for 20milliseconds
+                try {
+                    Thread.sleep(20)
+                    progressBarStatus++
+                } catch (e: InterruptedException) {
+                    e.printStackTrace()
                 }
-                ivDone.viewVisible()
-                progress.viewGone()
-                window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                setCancelable(true)
-                show()
-                textView.text = getString(R.string.video_saved)
-                val handler = Handler(Looper.getMainLooper())
-                handler.postDelayed({
-                    cancel()
-                }, 4000)
-            } else {
-                var progressBarStatus = 0
-                Thread {
-                    while (progressBarStatus < 100) {
-                        // sleeping for 20milliseconds
-                        try {
-                            Thread.sleep(20)
-                            progressBarStatus++
-                        } catch (e: InterruptedException) {
-                            e.printStackTrace()
-                        }
-
-                        mHandler.post {
-                            if (progressBarStatus == 99) {
-                                ivDone.viewVisible()
-                                progress.viewGone()
-                                binding.apply {
-
-                                    if (isLandScapeMode) {
-                                        videoPauseBtnLandScape.viewVisible()
-                                        videoPlayBtnLandScape.viewGone()
-                                        if (mVideoSurfaceViewNoneLandScape.isPlaying) {
-                                            mVideoSurfaceViewNoneLandScape.resume()
-                                        } else {
-                                            mVideoSurfaceViewNoneLandScape.start()
-                                        }
-                                    } else {
-                                        exoPause.viewVisible()
-                                        exoPlay.viewGone()
-                                        if (mVideoSurfaceViewNone.isPlaying) {
-                                            mVideoSurfaceViewNone.resume()
-                                        } else {
-                                            mVideoSurfaceViewNone.start()
-                                        }
-                                    }
-
-                                }
-                            } else {
-                                progress.progress = progressBarStatus
-                                if (progressBarStatus != 100) {
-                                    textView.text = "Exporting Video ${progressBarStatus}%"
-                                } else {
-                                    textView.text = "Video Saved"
-
-                                }
-//                                progress.progress = progressBarStatus
-//                                "Exporting Video ${progressBarStatus}%".also { textView.text = it }
-                            }
-                        }
+                mHandler.post(Runnable {
+                    if (progressBarStatus == 99) {
+                        ivDone.viewVisible()
+                        progress.viewGone()
+                        textView.text = getString(R.string.video_saved)
+                    } else {
+                        progress.progress = progressBarStatus
+                        "Exporting Video ${progressBarStatus}%".also { textView.text = it }
                     }
-                }.start()
-                window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                setCancelable(true)
-                show()
-                val handler = Handler(Looper.getMainLooper())
-                handler.postDelayed({
-                    cancel()
-                }, 4000)
+
+                })
             }
-        }
+
+        }.start()
+
+        dialog.window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.setCancelable(true)
+        dialog.show()
+
+        val handler = Handler()
+        handler.postDelayed({
+            dialog.cancel()
+            if (exoPlayer != null) exoPlayer?.play()
+            disableShareAndSave()
+        }, 4000)
     }
 
-    private fun setProgressDialogue(type: String) {
-        dialog = Dialog(this@VideoEditActivity)
-        dialog.apply {
-            setContentView(R.layout.custom_progressbar)
-            progressbar = findViewById(R.id.progressBar)
-            textView = findViewById(R.id.tv)
-            if (type == "process") {
-                textView?.text = "Video Processing 0%"
-            } else {
-                textView?.text = "Exporting Video 0%"
-            }
-
-            window!!.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setCancelable(false)
-            show()
-
-        }
+    private fun showDialog() {
+        statistics = null
+        Config.resetStatistics()
+        popUpForCompressedVideo.show(supportFragmentManager, "")
+        popUpForCompressedVideo.isCancelable = false
     }
 
-    private fun showProgressForCrop(progressBarStatus: Float) {
-        if (progressBarStatus <= 100.0) {
-            if (!listForLastFifty.contains(progressBarStatus.toString())) {
-                listForLastFifty.add(progressBarStatus.toString())
-                var value = counter2++
-                val progress = "Video Processing ${value + 50}%"
-                progressbar?.progress = value + 50
-                textView?.text = progress
-            }
-        }
+    private fun dismissDialog() {
+        popUpForCompressedVideo.dismiss()
     }
-
-    private fun showProgressForResize(progressBarStatus: Float) {
-        if (progressBarStatus <= 50.0) {
-            if (!listForFirstFifty.contains(progressBarStatus.toString())) {
-                listForFirstFifty.add(progressBarStatus.toString())
-                var value = counter++
-                val progress = "Video Processing ${value}%"
-                progressbar?.progress = value
-                textView?.text = progress
-                isHundredValue = true
-
-            }
-//            if (value <= 50) {
-//                val progress = "Video Processing ${value}%"
-//                progressbar?.progress = value
-//                textView?.text = progress
-//                isHundredValue = true
-//                Log.d("djdjdjjdjddj", "" + progressBarStatus)
-//            }
-        } else {
-            if (!isHundredValue) {
-                progressbar?.progress = 0
-                textView?.text = "0%"
-            }
-        }
-
-    }
-
-
-    private fun showProgressForBlur(progressBarStatus: Float, type: String) {
-        if (progressBarStatus <= 100.0) {
-            val progress: String
-            progress = if (type == "bottomCrop") {
-                "Video Processing ${progressBarStatus.toLong()}%"
-            } else {
-                "Exporting Video ${progressBarStatus.toLong()}%"
-            }
-            progressbar?.progress = progressBarStatus.toInt()
-            textView?.text = progress
-        }
-    }
-
 
     /* Enable callBack that show progress of video that is converted */
-    private fun enableStatisticsCallback(type: String) {
+    private fun enableStatisticsCallback() {
         Config.enableStatisticsCallback { newStatistics: Statistics ->
             statistics = newStatistics
             val timeInMilliseconds: Int = statistics!!.time
@@ -2768,31 +2051,14 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
                     ).toString()
 
                 lifecycleScope.launch {
-                    when (type) {
-                        "bottomCrop" -> {
-                            val value = String.format("%s", completePercentage).toInt() / 2
-                            val sum = value + 50
-                            showProgressForCrop(sum.toFloat())
-                        }
-                        "resize" -> {
-                            val value = String.format("%s", completePercentage).toInt() / 2
-                            showProgressForResize(
-                                value.toFloat()
-                            )
-                        }
-                        else -> {
-                            showProgressForBlur(
-                                String.format("%s", completePercentage).toFloat(), type
-                            )
-                        }
-                    }
+                    popUpForCompressedVideo.showProgressForBlur(
+                        String.format("%s", completePercentage).toFloat()
+                    )
                 }
-
             }
             throw AndroidRuntimeException("I am test exception thrown by test application")
         }
     }
-
 
     /* This function is get the height and width of video */
     private fun getHeight(uri: String) {
@@ -2808,10 +2074,12 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         videoHeight = retriever.extractMetadata(
             MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
         )?.let {
-            Integer.valueOf(it)
+            Integer.valueOf(
+                it
+            )
         }!!
-        Log.d("ddddddddddddd", "width$videoWidth")
-        Log.d("ddddddddddddd", "height$videoHeight")
+        Log.d("dddddddd", "widh" + videoWidth)
+        Log.d("dddddddd", "heigth" + videoHeight)
     }
 
     /* This function is get total duration of video */
@@ -2823,1286 +2091,60 @@ class VideoEditActivity : BaseActivity(), Player.Listener, SeekBar.OnSeekBarChan
         dur = rangeVal.toFloat() * 1000
     }
 
+    private fun disableShareAndSave() {
+        binding.homeToolbarId.ivDownload.isEnabled = false
+        binding.homeToolbarId.ivDownload.alpha = 0.5f
+        binding.homeToolbarId.ivShare.isEnabled = false
+        binding.homeToolbarId.ivShare.alpha = 0.5f
+    }
+
+    private fun enableShareAndSave() {
+        binding.homeToolbarId.ivDownload.isEnabled = true
+        binding.homeToolbarId.ivDownload.alpha = 1f
+        binding.homeToolbarId.ivShare.isEnabled = true
+        binding.homeToolbarId.ivShare.alpha = 1f
+    }
 
     override fun onBackPressed() {
-        if (isShowBackDialogue) {
-            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                override fun onGoToHomeOk() {
-                    onBackPressedDispatcher.onBackPressed() //with this line
-                    exitPopup.dismiss()
-                    deleteFiles()
-                    if (progressId != 0L) {
-                        FFmpeg.cancel(progressId)
-                        FFmpeg.cancel()
-                    }
+        exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
+            override fun onGoToHomeOk() {
+                onBackPressedDispatcher.onBackPressed() //with this line
+                exitPopup.dismiss()
+                deleteFiles()
+                if (progressId != 0L) {
+                    FFmpeg.cancel(progressId)
+                    FFmpeg.cancel()
                 }
-
-                override fun onGoToHomeCancel() {
-                    exitPopup.dismiss()
-
-                }
-
-            }, "back")
-            exitPopup.apply {
-                show(supportFragmentManager, "")
-                isCancelable = true
+                clearSessionsOfFullTopAndBottomBlur()
             }
-        } else {
-            onBackPressedDispatcher.onBackPressed() //with this line
-            deleteFiles()
-            if (progressId != 0L) {
-                FFmpeg.cancel(progressId)
-                FFmpeg.cancel()
-            }
-        }
 
+            override fun onGoToHomeCancel() {
+                exitPopup.dismiss()
+
+            }
+
+        }, "back")
+        exitPopup.show(supportFragmentManager, "")
+        exitPopup.isCancelable = true
     }
 
     private fun deleteFiles() {
         if (file3 != null) file3!!.delete()
         if (file1 != null) file1!!.delete()
         if (file2 != null) file2!!.delete()
-        if (compressedFile != null) compressedFile!!.delete()
         if (fileForMute != null) fileForMute!!.delete()
         if (extractAudioFile != null) extractAudioFile!!.delete()
         if (folder != null) folder!!.delete()
-        if (fullVideoFile != null) fullVideoFile!!.delete()
-        if (topBlurFinalOutputFile != null) topBlurFinalOutputFile!!.delete()
+        if (topBlurOutputFile != null) topBlurOutputFile!!.delete()
         if (bottomBlurOutputFile != null) bottomBlurOutputFile!!.delete()
-        if (bottomBlurOutputFileTwo != null) bottomBlurOutputFileTwo!!.delete()
-        if (bottomBlurFinalOutputFile != null) bottomBlurFinalOutputFile!!.delete()
         if (fullBlurOutputFile != null) fullBlurOutputFile!!.delete()
-
-
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun listeners() {
-        binding.apply {
-            blurSeekbar.apply {
-                setOnSeekBarChangeListener(this@VideoEditActivity)
-                progress = 50
-                max = 100
-            }
-            homeToolbarId.apply {
-                ivBack.apply {
-                    applyBoomEffect()
-                    setOnClickListener {
-                        if (isShowBackDialogue) {
-                            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                                override fun onGoToHomeOk() {
-                                    finish()
-                                    exitPopup.dismiss()
-                                    if (progressId != 0L) {
-                                        FFmpeg.cancel(progressId)
-                                        FFmpeg.cancel()
-                                    }
-                                    deleteFiles()
-                                }
-
-                                override fun onGoToHomeCancel() {
-                                    exitPopup.dismiss()
-                                }
-
-                            }, "back")
-                            exitPopup.apply {
-                                show(supportFragmentManager, "")
-                                isCancelable = true
-                            }
-                        } else {
-                            finish()
-                            if (progressId != 0L) {
-                                FFmpeg.cancel(progressId)
-                                FFmpeg.cancel()
-                            }
-                            deleteFiles()
-                        }
-                    }
-                }
-                ivShare.apply {
-                    applyBoomEffect()
-                    setOnClickListener {
-                        if (isBlurred) {
-                            if (topBlur) {
-                                if (isLargeSizeVideo) {
-                                    if (isMuted)
-                                        topBlurCommand(
-                                            finalMuteVideo,
-                                            topBlurFinalOutput,
-                                            seekbarRadius,
-                                            "topBlur",
-                                            "share"
-                                        )
-                                    else if (isDistortion)
-                                        topBlurCommand(
-                                            finalDistortedVideo,
-                                            topBlurFinalOutput,
-                                            seekbarRadius,
-                                            "topBlur",
-                                            "share"
-                                        )
-                                    else topBlurCommand(
-                                        compressFile,
-                                        topBlurFinalOutput,
-                                        seekbarRadius,
-                                        "topBlur",
-                                        "share"
-                                    )
-                                } else {
-                                    if (isMuted) topBlurCommand(
-                                        mutedVideo,
-                                        topBlurFinalOutput,
-                                        seekbarRadius,
-                                        "topBlur",
-                                        "share"
-                                    )
-                                    else if (isDistortion) topBlurCommand(
-                                        distortedVideo,
-                                        topBlurFinalOutput,
-                                        seekbarRadius,
-                                        "topBlur",
-                                        "share"
-                                    )
-                                    else topBlurCommand(
-                                        originalPath!!,
-                                        topBlurFinalOutput,
-                                        seekbarRadius,
-                                        "topBlur",
-                                        "share"
-                                    )
-                                }
-                            } else if (bottomBlur) {
-                                if (isLargeSizeVideo) {
-                                    if (isMuted) bottomBlurCommand(
-                                        finalMuteVideo,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                    else if (isDistortion) bottomBlurCommand(
-                                        finalDistortedVideo,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                    else bottomBlurCommand(
-                                        compressFile,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                } else {
-                                    if (isMuted) bottomBlurCommand(
-                                        mutedVideo,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                    else if (isDistortion) bottomBlurCommand(
-                                        distortedVideo,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                    else bottomBlurCommand(
-                                        originalPath!!,
-                                        bottomBlurFinalOutput,
-                                        seekbarRadius,
-                                        "bottomBlur",
-                                        "share"
-                                    )
-                                }
-
-                            } else if (fullBlur) {
-                                if (isLargeSizeVideo) {
-                                    if (isMuted) fullBlurCommand(
-                                        finalMuteVideo,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                    else if (isDistortion) fullBlurCommand(
-                                        finalDistortedVideo,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                    else fullBlurCommand(
-                                        compressFile,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                } else {
-                                    if (isMuted) fullBlurCommand(
-                                        mutedVideo,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                    else if (isDistortion) fullBlurCommand(
-                                        distortedVideo,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                    else fullBlurCommand(
-                                        originalPath!!,
-                                        fullBlurOutput,
-                                        seekbarRadius,
-                                        "fullBlur",
-                                        "share"
-                                    )
-                                }
-
-                            }
-                        } else {
-                            if (isMuted) {
-                                setShare(mutedVideo)
-                            } else if (isDistortion) {
-                                setShare(distortedVideo)
-                            }
-                        }
-                    }
-
-                }
-                ivDownload.apply {
-                    applyBoomEffect()
-                    setOnClickListener {
-                        saveVideo()
-                    }
-                }
-            }
-            buttonLayouts.apply {
-                buttonRemoveAudio.apply {
-                    setOnClickListener {
-                        if (isVideoHaveAudioTrack(originalPath!!)) {
-                            applyBoomEffect()
-                            resetAudioButtonItems()
-
-                            if (isLandScapeMode) {
-                                audioDistortionForLandScape.viewGone()
-                                audioRemoveForLandScape.viewVisible()
-                            } else {
-                                audioDistortion.viewGone()
-                                audioRemove.viewVisible()
-                            }
-
-                            buttonLayouts.buttonRemoveAudio.background = ContextCompat.getDrawable(
-                                this@VideoEditActivity, R.drawable.ss_corner_round_light_blue
-                            )
-                            buttonLayouts.ivRemoveAudio.apply {
-                                setImageDrawable(
-                                    ContextCompat.getDrawable(
-                                        context, R.drawable.ic_remove
-                                    )
-                                )
-                                setColorFilter(
-                                    ContextCompat.getColor(
-                                        context, R.color.white
-                                    )
-                                )
-                            }
-                            buttonLayouts.tvRemoveAudio.setTextColor(
-                                ContextCompat.getColor(
-                                    this@VideoEditActivity, R.color.white
-                                )
-                            )
-                            muteVideoCommands()
-                        } else {
-                            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                                override fun onGoToHomeOk() {
-                                    exitPopup.dismiss()
-                                }
-
-                                override fun onGoToHomeCancel() {
-                                    exitPopup.dismiss()
-                                }
-                            }, "noSound")
-                            exitPopup.show(supportFragmentManager, "")
-                            exitPopup.isCancelable = true
-
-                        }
-                    }
-                }
-                buttonRemoveDistortion.apply {
-                    setOnClickListener {
-                        if (isVideoHaveAudioTrack(originalPath!!)) {
-                            applyBoomEffect()
-                            if (distortedVideo != "") {
-                                resetPlayerForMute(distortedVideo)
-                                isShowBackDialogue = true
-                                finalVideo = ""
-                                isDistortion = true
-                                isMuted = false
-
-                                if (isLandScapeMode) {
-                                    audioDistortionForLandScape.viewVisible()
-                                    audioRemoveForLandScape.viewGone()
-                                } else {
-                                    audioDistortion.viewVisible()
-                                    audioRemove.viewGone()
-                                }
-
-                                enableShareAndSave()
-                                binding.apply {
-                                    buttonNoEffect.apply {
-                                        background = ContextCompat.getDrawable(
-                                            this@VideoEditActivity,
-                                            R.drawable.ss_corner_round_white_blue_corener
-                                        )
-                                        isEnabled = true
-                                    }
-                                    buttonLayouts.apply {
-                                        buttonRemoveAudio.isEnabled = true
-                                        buttonRemoveDistortion.isEnabled = false
-                                    }
-                                    ivNoEffect.apply {
-                                        setImageDrawable(
-                                            ContextCompat.getDrawable(
-                                                this@VideoEditActivity, R.drawable.ic_no_effect
-                                            )
-                                        )
-                                        setColorFilter(
-                                            ContextCompat.getColor(
-                                                context, R.color.white
-                                            )
-                                        )
-                                    }
-
-                                    tvNoEffect.setTextColor(
-                                        ContextCompat.getColor(
-                                            this@VideoEditActivity, R.color.white
-                                        )
-                                    )
-
-                                    resetAudioButtonItems()
-                                    buttonLayouts.buttonRemoveDistortion.background =
-                                        ContextCompat.getDrawable(
-                                            this@VideoEditActivity,
-                                            R.drawable.ss_corner_round_light_blue
-                                        )
-
-                                    buttonLayouts.ivAddDistortion.apply {
-                                        setImageDrawable(
-                                            ContextCompat.getDrawable(
-                                                context, R.drawable.ic_disortion
-                                            )
-                                        )
-                                        setColorFilter(
-                                            ContextCompat.getColor(
-                                                context, R.color.white
-                                            )
-                                        )
-                                    }
-
-                                    buttonLayouts.tvAddDistortion.setTextColor(
-                                        ContextCompat.getColor(
-                                            this@VideoEditActivity, R.color.white
-                                        )
-                                    )
-
-
-                                }
-                            } else {
-                                audioExtractCommand(fullOutPut)
-                            }
-
-                        } else {
-                            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                                override fun onGoToHomeOk() {
-                                    exitPopup.dismiss()
-                                }
-
-                                override fun onGoToHomeCancel() {
-                                    exitPopup.dismiss()
-                                }
-                            }, "noSound")
-                            exitPopup.show(supportFragmentManager, "")
-                            exitPopup.isCancelable = true
-                        }
-                    }
-                }
-            }
-
-            buttonNoEffect.apply {
-                setOnClickListener {
-                    if (isVideoHaveAudioTrack(originalPath!!)) {
-                        applyBoomEffect()
-                        buttonNoEffect.isEnabled = false
-                        if (isLandScapeMode) {
-                            audioDistortionForLandScape.viewGone()
-                            audioRemoveForLandScape.viewGone()
-                        } else {
-                            audioDistortion.viewGone()
-                            audioRemove.viewGone()
-                        }
-
-                        resetAudioButtonItems()
-                        buttonNoEffect.background = ContextCompat.getDrawable(
-                            this@VideoEditActivity, R.drawable.ss_corner_round_white
-                        )
-                        ivNoEffect.apply {
-                            setImageDrawable(
-                                ContextCompat.getDrawable(
-                                    this@VideoEditActivity, R.drawable.ic_no_effect_unselect
-                                )
-                            )
-                            setColorFilter(
-                                ContextCompat.getColor(
-                                    context, R.color.grey_color
-                                )
-                            )
-                        }
-                        tvNoEffect.setTextColor(
-                            ContextCompat.getColor(
-                                this@VideoEditActivity, R.color.grey_color
-                            )
-                        )
-
-                        if (isMuted) {
-                            buttonLayouts.buttonRemoveAudio.isEnabled = true
-                            resetPlayerForMute(originalPath!!)
-                            isMuted = false
-                            disableShareAndSave()
-
-                        } else if (isDistortion) {
-                            buttonLayouts.buttonRemoveDistortion.isEnabled = true
-                            resetPlayerForMute(originalPath!!)
-                            isDistortion = false
-                            disableShareAndSave()
-                        }
-                    }
-                }
-            }
-            cvNonBlur.setOnClickListener(this@VideoEditActivity)
-            cvTopBlur.setOnClickListener(this@VideoEditActivity)
-            cvBottomBlur.setOnClickListener(this@VideoEditActivity)
-            cvFullBlur.setOnClickListener(this@VideoEditActivity)
-
-            relParent.setOnClickListener {
-                if (isLandScapeMode) {
-                    if (!checkVisibility) {
-                        checkVisibility = true
-                        playPauseLayoutForLandScape.viewGone()
-                        seekbarLayoutForLandScape.viewGone()
-                    } else {
-                        checkVisibility = false
-                        playPauseLayoutForLandScape.viewVisible()
-                        seekbarLayoutForLandScape.viewVisible()
-                    }
-                } else {
-                    if (!checkVisibility) {
-                        checkVisibility = true
-                        playPauseLayout.viewGone()
-                        seekbarLayout.viewGone()
-                    } else {
-                        checkVisibility = false
-                        playPauseLayout.viewVisible()
-                        seekbarLayout.viewVisible()
-                    }
-                }
-            }
-
-            videoPauseBtnLandScape.setOnClickListener {
-                if (topBlur) {
-                    mediaPlayerTop?.pause()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.pause()
-                } else {
-                    mediaPlayerFull?.pause()
-                }
-                mVideoSurfaceViewNoneLandScape.pause()
-
-                videoPauseBtnLandScape.viewGone()
-                videoPlayBtnLandScape.viewVisible()
-            }
-            videoPlayBtnLandScape.setOnClickListener {
-                if (topBlur) {
-                    mediaPlayerTop?.start()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.start()
-                } else {
-                    mediaPlayerFull?.start()
-                }
-                if (mVideoSurfaceViewNoneLandScape.isPlaying) {
-                    mVideoSurfaceViewNoneLandScape.resume()
-                } else {
-                    mVideoSurfaceViewNoneLandScape.start()
-                }
-                setPlayerSeekBarForLandScape()
-                videoPauseBtnLandScape.viewVisible()
-                videoPlayBtnLandScape.viewGone()
-
-            }
-
-            exoPause.setOnClickListener {
-                if (topBlur) {
-                    mediaPlayerTop?.pause()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.pause()
-                } else {
-                    mediaPlayerFull?.pause()
-                }
-                mVideoSurfaceViewNone.pause()
-
-                exoPause.viewGone()
-                exoPlay.viewVisible()
-            }
-
-            exoPlay.setOnClickListener {
-                if (topBlur) {
-                    mediaPlayerTop?.start()
-                } else if (bottomBlur) {
-                    mediaPlayerBottom?.start()
-                } else {
-                    mediaPlayerFull?.start()
-                }
-                if (mVideoSurfaceViewNone.isPlaying) {
-                    mVideoSurfaceViewNone.resume()
-                } else {
-                    mVideoSurfaceViewNone.start()
-                }
-                setPlayerSeekBar()
-                exoPause.viewVisible()
-                exoPlay.viewGone()
-
-            }
-        }
+    /* This function is used for clear the session of top bottom and full blur*/
+    private fun clearSessionsOfFullTopAndBottomBlur() {
+        clearSessionTopBlur()
+        clearSessionBottomBlur()
+        clearSessionFullBlur()
     }
-
-    //Custom Bottom navigation View
-    private fun setBottomLayout() {
-        binding.apply {
-            ivCensor.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_censor_selected
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.white
-                    )
-                )
-            }
-            tvCenser.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            viewCensor.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            viewAudio.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-            censorLayout.setOnClickListener {
-                censorTab()
-                setCensorVisibility()
-                if (isLandScapeMode) {
-                    audioChangeLayoutForLanScape.viewGone()
-                } else {
-                    audioChangeLayout.viewGone()
-                }
-
-
-            }
-            audioLayout.setOnClickListener {
-                audioTab()
-                setAudioVisibility()
-                if (isLandScapeMode) {
-                    audioChangeLayoutForLanScape.viewVisible()
-                } else {
-                    audioChangeLayout.viewVisible()
-                }
-
-            }
-        }
-    }
-
-    private fun setCensorVisibility() {
-        binding.run {
-            blurLayouts.viewVisible()
-            layoutAudioChangeButton.viewGone()
-            buttonNoEffect.viewGone()
-        }
-
-        if (topBlur || bottomBlur || fullBlur) binding.blurLinearlayout.viewVisible()
-        else binding.blurLinearlayout.viewGone()
-
-    }
-
-    private fun setAudioVisibility() {
-        binding.run {
-            blurLinearlayout.viewGone()
-            blurLayouts.viewGone()
-            layoutAudioChangeButton.viewVisible()
-            buttonNoEffect.viewVisible()
-        }
-    }
-
-    private fun censorTab() {
-        resetItems()
-        binding.apply {
-            ivCensor.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_censor_selected
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.white
-                    )
-                )
-            }
-            tvCenser.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            viewCensor.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-        }
-    }
-
-    private fun audioTab() {
-        resetItems()
-        binding.apply {
-            ivSpeaker.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_speaker_selected
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.white
-                    )
-                )
-            }
-            tvAudio.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            viewAudio.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-        }
-    }
-
-    private fun resetItems() {
-        binding.apply {
-            ivCensor.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_censor_unfilled
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.grey_color
-                    )
-                )
-            }
-            tvCenser.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-            viewCensor.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-
-            ivSpeaker.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_speaker_unfilled
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.grey_color
-                    )
-                )
-            }
-            tvAudio.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-
-            viewAudio.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-        }
-    }
-
-    private fun resetAudioButtonItems() {
-        binding.buttonLayouts.apply {
-            buttonRemoveAudio.background = ContextCompat.getDrawable(
-                this@VideoEditActivity, R.drawable.ss_corner_round_dark_blue
-            )
-            buttonRemoveDistortion.background = ContextCompat.getDrawable(
-                this@VideoEditActivity, R.drawable.ss_corner_round_dark_blue
-            )
-
-            ivRemoveAudio.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_remove_unfilled
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.grey_color
-                    )
-                )
-            }
-
-            tvRemoveAudio.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-
-            ivAddDistortion.apply {
-                setImageDrawable(
-                    ContextCompat.getDrawable(
-                        context, R.drawable.ic_disortion_unfilled
-                    )
-                )
-                setColorFilter(
-                    ContextCompat.getColor(
-                        context, R.color.grey_color
-                    )
-                )
-            }
-
-            tvAddDistortion.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-        }
-    }
-
-    /* This function is set default view of filter layout */
-    private fun defaultView() {
-        binding.apply {
-            cvNonBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.un_selected_button
-                )
-            )
-            tvNoneBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-            ivNoneBlur.setColorFilter(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                ), PorterDuff.Mode.SRC_IN
-            )
-            cvTopBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.un_selected_button
-                )
-            )
-            tvTopBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-            ivTopBlur.setColorFilter(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                ), PorterDuff.Mode.SRC_IN
-            )
-            cvBottomBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.un_selected_button
-                )
-            )
-            tvBottomBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-
-            ivBottomBlur.setColorFilter(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                ), PorterDuff.Mode.SRC_IN
-            )
-            cvFullBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.un_selected_button
-                )
-            )
-
-            tvFullBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.grey_color
-                )
-            )
-            ivFullBlur.setImageResource(R.drawable.ic_full_blur)
-        }
-
-    }
-
-    private fun setNonBlur() {
-        binding.apply {
-            cvNonBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.selected_btn_color
-                )
-            )
-            tvNoneBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            ivNoneBlur.setColorFilter(
-                ContextCompat.getColor(this@VideoEditActivity, R.color.white),
-                PorterDuff.Mode.SRC_IN
-            )
-        }
-    }
-
-    private fun setTopBlur() {
-        binding.apply {
-            cvTopBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.selected_btn_color
-                )
-            )
-            tvTopBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            ivTopBlur.setColorFilter(
-                ContextCompat.getColor(this@VideoEditActivity, R.color.white),
-                PorterDuff.Mode.SRC_IN
-            )
-        }
-
-    }
-
-    private fun setBottomBlur() {
-        binding.apply {
-            cvBottomBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.selected_btn_color
-                )
-            )
-            tvBottomBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            ivBottomBlur.setColorFilter(
-                ContextCompat.getColor(this@VideoEditActivity, R.color.white),
-                PorterDuff.Mode.SRC_IN
-            )
-        }
-    }
-
-    private fun setFullBlur() {
-        binding.apply {
-            cvFullBlur.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.selected_btn_color
-                )
-            )
-            tvFullBlur.setTextColor(
-                ContextCompat.getColor(
-                    this@VideoEditActivity, R.color.white
-                )
-            )
-            ivFullBlur.setImageResource(R.drawable.ic_full_blur_white)
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        if (isLandScapeMode) {
-            mHandler?.removeCallbacks(updateProgressActionForLandScape)
-        } else {
-            mHandler?.removeCallbacks(updateProgressAction)
-        }
-
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if (progressId != 0L) {
-            FFmpeg.cancel(progressId)
-            FFmpeg.cancel()
-        }
-        if (isLandScapeMode) {
-            mHandler?.removeCallbacks(updateProgressActionForLandScape)
-        } else {
-            mHandler?.removeCallbacks(updateProgressAction)
-        }
-
-        topBlur = false
-        nonBlur = false
-        bottomBlur = false
-        fullBlur = false
-        deleteFiles()
-        AppStorage.apply {
-            clearSessionTopBlur()
-            clearSessionBottomBlur()
-            clearSessionFullBlur()
-        }
-    }
-
-    /* That function is creating files and folders */
-    private fun createFilesAndDirectories() {
-        file1 =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-
-        file2 =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-        compressedFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-
-        file3 =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-
-        fullVideoFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-        topBlurFinalOutputFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-
-        bottomBlurOutputFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-        bottomBlurOutputFileTwo =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-        bottomBlurFinalOutputFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-        fullBlurOutputFile =
-            File(getExternalFilesDir(applicationContext.resources.getString(R.string.app_name)).toString())
-
-        if (!file1!!.exists()) {
-            file1!!.mkdirs()
-        }
-
-        if (!file2!!.exists()) {
-            file2!!.mkdirs()
-        }
-        if (!compressedFile!!.exists()) {
-            compressedFile!!.mkdirs()
-        }
-        if (!file3!!.exists()) {
-            file3!!.mkdirs()
-        }
-
-        if (!fullVideoFile!!.exists()) {
-            fullVideoFile!!.mkdirs()
-        }
-
-        if (!topBlurFinalOutputFile!!.exists()) {
-            topBlurFinalOutputFile!!.mkdirs()
-        }
-
-        if (!bottomBlurOutputFile!!.exists()) {
-            bottomBlurOutputFile!!.mkdirs()
-        }
-
-        if (!bottomBlurOutputFileTwo!!.exists()) {
-            bottomBlurOutputFileTwo!!.mkdirs()
-        }
-        if (!bottomBlurFinalOutputFile!!.exists()) {
-            bottomBlurFinalOutputFile!!.mkdirs()
-        }
-
-        if (!fullBlurOutputFile!!.exists()) {
-            fullBlurOutputFile!!.mkdirs()
-        }
-
-        downloadFile = File(file1, generateBlurName() + ".mp4")
-        downloadFile2 = File(file2, "VIDEO_" + System.currentTimeMillis() + ".mp4")
-        compresseddFile =
-            File(compressedFile, "COMPRESSED" + System.currentTimeMillis() + ".mp4")
-        downloadFile3 = File(file3, "VIDEO2_" + System.currentTimeMillis() + ".mp4")
-
-        fullVideoForCropFile =
-            File(fullVideoFile, Full_VIDEO_PATH + System.currentTimeMillis() + ".mp4")
-        topBlurFinalDownload =
-            File(topBlurFinalOutputFile, CENSORX_TOP_BLUR + System.currentTimeMillis() + ".mp4")
-
-        bottomBlurDownload =
-            File(bottomBlurOutputFile, CROP_BOTTOM_BLUR + System.currentTimeMillis() + ".mp4")
-
-        bottomBlurDownloadTwo = File(
-            bottomBlurOutputFileTwo, CROP_BOTTOM_BLUR_TWO + System.currentTimeMillis() + ".mp4"
-        )
-
-        bottomBlurFinalDownload = File(
-            bottomBlurFinalOutputFile, CENSORX_BOTTOM_BLUR + System.currentTimeMillis() + ".mp4"
-        )
-        fullBlurDownload =
-            File(fullBlurOutputFile, CENSORX_FULL_BLUR + System.currentTimeMillis() + ".mp4")
-
-        fullOutPut = fullVideoForCropFile!!.absolutePath
-        topBlurFinalOutput = topBlurFinalDownload!!.absolutePath
-        bottomBlurFinalOutput = bottomBlurFinalDownload!!.absolutePath
-        bottomBlurOutput = bottomBlurDownload!!.absolutePath
-        bottomBlurOutputTwo = bottomBlurDownloadTwo!!.absolutePath
-        fullBlurOutput = fullBlurDownload!!.absolutePath
-        outPutForMutedBlurredVideo = downloadFile!!.absolutePath
-        secondOutputForBlur = downloadFile3!!.absolutePath
-        lessResolatedFile = downloadFile2!!.absolutePath
-        compressFile = compresseddFile!!.absolutePath
-
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (isLandScapeMode) {
-            binding.mVideoSurfaceViewNoneLandScape.pause()
-            mHandler?.removeCallbacks(updateProgressActionForLandScape)
-            videoPosition = binding.mVideoSurfaceViewNoneLandScape.currentPosition
-        } else {
-            binding.mVideoSurfaceViewNone.pause()
-            mHandler?.removeCallbacks(updateProgressAction)
-            videoPosition = binding.mVideoSurfaceViewNone.currentPosition
-        }
-
-
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (isCompression) {
-            if (isLandScapeMode) {
-                binding.relLayoutLandScape.viewGone()
-            } else {
-                binding.relLayout.viewGone()
-            }
-
-        } else {
-            if (isLandScapeMode) {
-                mHandler = Handler(Looper.getMainLooper())
-                mHandler?.post(updateProgressActionForLandScape)
-                updateProgressForLandScape()
-                binding.videoPlayBtnLandScape.viewGone()
-                binding.videoPauseBtnLandScape.viewVisible()
-                if (isBlurred) {
-                    if (topBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerTop?.seekTo(videoPosition)
-                                mediaPlayerTop?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNoneLandScape.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        } else {
-                            mediaPlayerTop?.seekTo(videoPosition)
-                            mediaPlayerTop?.start()
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        }
-
-                    } else if (bottomBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerBottom?.seekTo(videoPosition)
-                                mediaPlayerBottom?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNoneLandScape.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        } else {
-                            mediaPlayerBottom?.seekTo(0)
-                            mediaPlayerBottom?.start()
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        }
-
-                    } else if (fullBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerFull?.seekTo(videoPosition)
-                                mediaPlayerFull?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNoneLandScape.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        } else {
-                            mediaPlayerFull?.seekTo(0)
-                            mediaPlayerFull?.start()
-                            binding.mVideoSurfaceViewNoneLandScape.start()
-                        }
-                    }
-                } else {
-                    if (videoPosition != 0) {
-                        binding.mVideoSurfaceViewNoneLandScape.seekTo(videoPosition)
-                        binding.mVideoSurfaceViewNoneLandScape.start()
-                    } else {
-                        binding.mVideoSurfaceViewNoneLandScape.start()
-                    }
-                }
-            } else {
-                mHandler = Handler(Looper.getMainLooper())
-                mHandler?.post(updateProgressAction)
-                updateProgress()
-                binding.exoPlay.viewGone()
-                binding.exoPause.viewVisible()
-                if (isBlurred) {
-                    if (topBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerTop?.seekTo(videoPosition)
-                                mediaPlayerTop?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNone.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNone.start()
-
-                        } else {
-                            mediaPlayerTop?.seekTo(videoPosition)
-                            mediaPlayerTop?.start()
-                            binding.mVideoSurfaceViewNone.start()
-                        }
-                    } else if (bottomBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerBottom?.seekTo(videoPosition)
-                                mediaPlayerBottom?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNone.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNone.start()
-                        } else {
-                            mediaPlayerBottom?.seekTo(0)
-                            mediaPlayerBottom?.start()
-                            binding.mVideoSurfaceViewNone.start()
-                        }
-
-                    } else if (fullBlur) {
-                        if (videoPosition != 0) {
-                            val handler = Handler(Looper.getMainLooper())
-                            handler.postDelayed({
-                                mediaPlayerFull?.seekTo(videoPosition)
-                                mediaPlayerFull?.start()
-                            }, 200)
-                            binding.mVideoSurfaceViewNone.seekTo(videoPosition)
-                            binding.mVideoSurfaceViewNone.start()
-
-                        } else {
-                            mediaPlayerFull?.seekTo(0)
-                            mediaPlayerFull?.start()
-                            binding.mVideoSurfaceViewNone.start()
-                        }
-
-                    }
-                } else {
-                    if (videoPosition != 0) {
-                        binding.mVideoSurfaceViewNone.seekTo(videoPosition)
-                        binding.mVideoSurfaceViewNone.start()
-                    } else {
-                        binding.mVideoSurfaceViewNone.start()
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onCompletion(p0: MediaPlayer?) {
-        if (isLandScapeMode) {
-            binding.videoPauseBtnLandScape.viewGone()
-            binding.videoPlayBtnLandScape.viewVisible()
-            totalTimeForLandScape.viewVisible()
-            durationLandScape.viewGone()
-            totalTimeForLandScape.text = Constants.formatSeconds(totalDuration)
-        } else {
-            binding.exoPause.viewGone()
-            binding.exoPlay.viewVisible()
-            totalTime.viewVisible()
-            duration.viewGone()
-            totalTime.text = Constants.formatSeconds(totalDuration)
-        }
-
-    }
-
-    private fun enableShareAndSave() {
-        binding.homeToolbarId.apply {
-            ivDownload.apply {
-                isEnabled = true
-                alpha = 1f
-            }
-            ivShare.apply {
-                isEnabled = true
-                alpha = 1f
-            }
-        }
-    }
-
-    private fun disableShareAndSave() {
-        binding.homeToolbarId.apply {
-            ivDownload.isEnabled = false
-            ivDownload.alpha = 0.5f
-            ivShare.isEnabled = false
-            ivShare.alpha = 0.5f
-        }
-    }
-
-    private fun checkOrientationOfVideo() {
-        val mp = MediaPlayer()
-        try {
-            mp.setDataSource(originalPath)
-            mp.prepare()
-            mp.setOnVideoSizeChangedListener { _, width, height ->
-                if (width < height) {
-                    isLandScapeMode = false
-                } else {
-                    isLandScapeMode = true
-                }
-            }
-        } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-        } catch (e: IllegalStateException) {
-            e.printStackTrace()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun pxToDp(px: Int): Int {
-        val displayMetrics: DisplayMetrics = resources.displayMetrics
-        return (px / (displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT)).roundToInt().toInt()
-    }
-
 
 }

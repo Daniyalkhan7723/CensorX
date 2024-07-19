@@ -4,17 +4,13 @@ import android.graphics.Color
 import android.graphics.Point
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.*
 import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.FragmentManager
-import androidx.fragment.app.FragmentTransaction
 import com.censorchi.R
 import com.censorchi.databinding.DialogueForVideoProgressBinding
 
 class DialogueForShowVideoProgress() : DialogFragment() {
     private lateinit var binding: DialogueForVideoProgressBinding
-
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -39,15 +35,15 @@ class DialogueForShowVideoProgress() : DialogFragment() {
         return view
     }
 
-    fun showProgress() {
-//        val progress = "Processing Video ${progresss.toLong()}%"
-//        binding.progressBar.progress = progresss.toInt()
-//        binding.tv.text = progress
+    fun showProgress(progresss: Float) {
+        val progress = "Processing Video ${progresss.toLong()}%"
+        binding.progressBar.progress = progresss.toInt()
+        binding.tv.text = progress
     }
 
     fun showProgressForBlur(progresss: Float) {
         if (progresss <= 100.0) {
-            val progress = "Exporting Video ${progresss.toLong()}%"
+            val progress = "Processing Video ${progresss.toLong()}%"
             binding.progressBar.progress = progresss.toInt()
             binding.tv.text = progress
         }

@@ -5,7 +5,6 @@ import android.graphics.Point
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Handler
-import android.os.Looper
 import android.view.*
 import androidx.fragment.app.DialogFragment
 import com.censorchi.R
@@ -69,7 +68,7 @@ class MaterialDialogHelper(var type: String) : DialogFragment() {
                 //Class variables
                 binding.ivDone.viewGone()
                 binding.progressBar.viewVisible()
-                val mHandler = Handler(Looper.getMainLooper())
+                val mHandler = Handler()
                 var progressBarStatus = 0
 
                 Thread {
@@ -102,7 +101,7 @@ class MaterialDialogHelper(var type: String) : DialogFragment() {
         val size = Point()
         // Store dimensions of the screen in `size`
         // Store dimensions of the screen in `size`
-        window!!.windowManager.defaultDisplay.also {
+        val display: Display = window!!.windowManager.defaultDisplay.also {
             it.getSize(size)
         }
         // Set the width of the dialog proportional to 75% of the screen width

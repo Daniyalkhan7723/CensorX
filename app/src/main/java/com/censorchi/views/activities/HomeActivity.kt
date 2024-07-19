@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
@@ -35,7 +34,8 @@ class HomeActivity : BaseActivity() {
         fullScreenWithStatusBarWhiteIcon()
 
         try {
-            val versionName: String = packageManager.getPackageInfo(packageName, 0).versionName
+            val versionName: String = packageManager
+                .getPackageInfo(packageName, 0).versionName
             "App version $versionName".also {
                 binding.tvAppVersion.text = it
             }
@@ -59,45 +59,23 @@ class HomeActivity : BaseActivity() {
                             R.drawable.backgroundround
                         )
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        checkAndRequestPermission(
-                            arrayOf(
-                                Manifest.permission.READ_MEDIA_IMAGES,
-                                Manifest.permission.READ_MEDIA_VIDEO,
-                                Manifest.permission.READ_MEDIA_AUDIO,
-                            )
-                        ) { permissionResults ->
-                            if (permissionResults.none { it.value != PackageManager.PERMISSION_GRANTED }) {
-                                val photoPickerIntent = Intent(Intent.ACTION_PICK)
-                                photoPickerIntent.type = "image/* video/*"
-                                startActivityForResult(
-                                    photoPickerIntent,
-                                    REQUEST_CODE_PICK_IMAGE
-                                )//                    selectImageFromGallery()
-                            } else {
-                                showAlertDialog()
-                            }
-                        }
-                    } else {
-                        checkAndRequestPermission(
-                            arrayOf(
-                                Manifest.permission.READ_EXTERNAL_STORAGE,
-                                Manifest.permission.WRITE_EXTERNAL_STORAGE
-                            )
-                        ) { permissionResults ->
-                            if (permissionResults.none { it.value != PackageManager.PERMISSION_GRANTED }) {
-                                val photoPickerIntent = Intent(Intent.ACTION_PICK)
-                                photoPickerIntent.type = "image/* video/*"
-                                startActivityForResult(
-                                    photoPickerIntent,
-                                    REQUEST_CODE_PICK_IMAGE
-                                )//                    selectImageFromGallery()
-                            } else {
-                                showAlertDialog()
-                            }
+                    checkAndRequestPermission(
+                        arrayOf(
+                            Manifest.permission.READ_EXTERNAL_STORAGE,
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        )
+                    ) { permissionResults ->
+                        if (permissionResults.none { it.value != PackageManager.PERMISSION_GRANTED }) {
+                            val photoPickerIntent = Intent(Intent.ACTION_PICK)
+                            photoPickerIntent.type = "image/* video/*"
+                            startActivityForResult(
+                                photoPickerIntent,
+                                REQUEST_CODE_PICK_IMAGE
+                            )//                    selectImageFromGallery()
+                        } else {
+                            showAlertDialog()
                         }
                     }
-
 
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -111,32 +89,21 @@ class HomeActivity : BaseActivity() {
             true
 
         }
+
     }
 
 
     override fun onResume() {
         super.onResume()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                startActivity(Intent(this@HomeActivity, GetStartedActivity::class.java))
-                finish()
-            }
-        } else {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                startActivity(Intent(this@HomeActivity, GetStartedActivity::class.java))
-                finish()
 
-            }
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            startActivity(Intent(this@HomeActivity, GetStartedActivity::class.java))
+            finish()
         }
-
     }
 
     @Deprecated("Deprecated in Java")
@@ -158,6 +125,7 @@ class HomeActivity : BaseActivity() {
                         val intent = Intent(this, ImageEditActivity::class.java)
                         intent.putExtra(Constants.IMAGE_PATH, a)
                         startActivity(intent)
+
                     } else if (uri.toString().contains(VIDEO)) {
                         val intent = Intent(this, VideoEditActivity::class.java)
                         intent.putExtra(Constants.VIDEO_PATH, uri.toString())
@@ -168,6 +136,7 @@ class HomeActivity : BaseActivity() {
                 }
             }
         }
+
     }
 
     private fun getRealPathFromURI(context: Context, contentUri: Uri?): String? {
@@ -208,7 +177,7 @@ class HomeActivity : BaseActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?) = if (keyCode == KeyEvent.KEYCODE_BACK) {
         doubleBackToExitPressedOnce = if (doubleBackToExitPressedOnce) {
             moveTaskToBack(true)
-            false
+             false
         } else {
             Toast.makeText(this, "Press again to exit", Toast.LENGTH_SHORT).show()
             true

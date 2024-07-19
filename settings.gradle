@@ -20,4 +20,3 @@ dependencyResolutionManagement {
 rootProject.name = "CensorChi"
 include ':app'
 include ':soundTouch'
-include ':compressvideo'

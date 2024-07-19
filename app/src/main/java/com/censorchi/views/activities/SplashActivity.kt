@@ -21,10 +21,10 @@ class SplashActivity : BaseActivity() {
 
         clearSession()
         fullScreenWithStatusBarWhiteIcon()
-        binding.apply {
-            tvCensorX.animation = AnimationUtils.loadAnimation(this@SplashActivity, R.anim.top_animation)
-            tvBlurFaces.animation = AnimationUtils.loadAnimation(this@SplashActivity, R.anim.top_animation)
-        }
+        binding.tvCensorX.animation = AnimationUtils.loadAnimation(this, R.anim.top_animation)
+        binding.tvBlurFaces.animation = AnimationUtils.loadAnimation(this, R.anim.top_animation)
+
+
         lifecycleScope.launch {
             delay(4000)
             nextScreen()
@@ -33,11 +33,9 @@ class SplashActivity : BaseActivity() {
     }
 
     private fun clearSession() {
-        AppStorage.apply {
-            clearSessionTopBlur()
-            clearSessionBottomBlur()
-            clearSessionFullBlur()
-        }
+        AppStorage.clearSessionTopBlur()
+        AppStorage.clearSessionBottomBlur()
+        AppStorage.clearSessionFullBlur()
     }
 
     private fun nextScreen() {

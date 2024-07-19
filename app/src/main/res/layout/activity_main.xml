@@ -1,146 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center_horizontal"
+  >
 
-    <RelativeLayout
-        android:id="@+id/rectangles"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/_200sdp"
-        android:layout_centerHorizontal="true"
-
-        >
-
-        <VideoView
-            android:id="@+id/videoView1"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_centerInParent="true"
-
-
-            />
-
-
-    </RelativeLayout>
-
-    <!--    <androidx.constraintlayout.widget.ConstraintLayout-->
-    <!--        android:id="@+id/rectangles"-->
-    <!--        android:layout_width="match_parent"-->
-    <!--        android:layout_height="match_parent"-->
-    <!--        android:layout_marginTop="10dp"-->
-    <!--        android:layout_marginBottom="@dimen/_250sdp"-->
-    <!--        >-->
-
-    <!--        <VideoView-->
-    <!--            android:id="@+id/videoView1"-->
-    <!--            android:layout_width="0dp"-->
-    <!--            android:layout_height="0dp"-->
-    <!--            app:layout_constraintBottom_toBottomOf="parent"-->
-    <!--            app:layout_constraintEnd_toEndOf="parent"-->
-    <!--            app:layout_constraintStart_toStartOf="parent"-->
-    <!--            app:layout_constraintTop_toTopOf="parent" />-->
-    <!--    </androidx.constraintlayout.widget.ConstraintLayout>-->
-
-    <!--    <RelativeLayout-->
-    <!--        android:id="@+id/rectangles"-->
-    <!--        android:layout_width="match_parent"-->
-    <!--        android:layout_height="@dimen/_200sdp"-->
-    <!--        android:layout_centerHorizontal="true"-->
-    <!--        android:background="@color/black"-->
-    <!--        android:visibility="visible">-->
-
-    <!--        <VideoView-->
-    <!--            android:id="@+id/videoView1"-->
-    <!--            android:layout_width="match_parent"-->
-    <!--            android:layout_height="match_parent"-->
-    <!--            android:layout_centerInParent="true" />-->
-
-    <!--    </RelativeLayout>-->
-
-    <RelativeLayout
-        android:id="@+id/relLayout1"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/_300sdp"
-        android:layout_below="@+id/rectangles"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="@dimen/_10sdp"
-        android:visibility="gone">
-
-        <RelativeLayout
-            android:id="@+id/relLayout"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/_300sdp"
-            android:layout_centerInParent="true">
-
-            <com.sherazkhilji.videffects.view.VideoSurfaceView
-                android:id="@+id/videoView2"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_centerInParent="true"
-                android:layout_marginTop="@dimen/_10sdp"
-
-                />
-
-        </RelativeLayout>
-    </RelativeLayout>
-
-
-    <!--    <RelativeLayout-->
-    <!--        android:layout_width="match_parent"-->
-    <!--        android:layout_height="@dimen/_230sdp"-->
-    <!--        android:layout_marginTop="@dimen/_10sdp"-->
-    <!--        app:layout_constraintStart_toStartOf="@id/videoView1"-->
-
-    <!--        >-->
-
-    <!--        <com.sherazkhilji.videffects.view.VideoSurfaceView-->
-    <!--            android:id="@+id/videoView2"-->
-    <!--            android:layout_width="match_parent"-->
-    <!--            android:layout_height="match_parent"-->
-    <!--            android:layout_alignParentBottom="true"-->
-    <!--            android:layout_centerInParent="true" />-->
-
-    <!--    </RelativeLayout>-->
-
-
-    <LinearLayout
-        android:id="@+id/brnLay"
+    <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/relLayout1"
-        android:layout_marginTop="@dimen/_10sdp"
-        android:orientation="horizontal"
-        android:weightSum="3">
+        android:id="@+id/bt_select"
+        android:text="Select Video"/>
 
-        <Button
-            android:id="@+id/topbtn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:onClick="topBlur"
-            android:text="Top" />
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:fitsSystemWindows="true">
 
-        <Button
-            android:id="@+id/bottombtn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:onClick="bottomBlur"
-            android:text="Bottom" />
+        <VideoView
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:id="@+id/video_view1"
+            android:visibility="gone"/>
 
-        <Button
-            android:id="@+id/fullbtn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:onClick="fullBlur"
-            android:text="Full" />
+    </RelativeLayout>
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/TextView1"
+        android:text="Original Video"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:layout_marginTop="8dp"/>
 
-    </LinearLayout>
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:fitsSystemWindows="true">
 
-</RelativeLayout>
+        <VideoView
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:id="@+id/Video_view2"
+            android:visibility="gone"
+            android:layout_marginTop="32dp"/>
+
+    </RelativeLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/text_view2"
+        android:text="Compressed Video"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/TextView3"
+        android:textSize="16sp"
+        android:visibility="gone"
+        android:layout_marginTop="4dp"/>
+
+</LinearLayout>

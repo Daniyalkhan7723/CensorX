@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Censor X</string>
+    <string name="app_name">CensorX</string>
     <string name="allow">Allow</string>
     <string name="don_t_allow">Don\'t allow</string>
     <string name="please_allow_access_to_your_photos_library_to_pick_pictures_videos"><![CDATA[Please allow access to your Gallery to]]></string>
@@ -32,7 +32,7 @@
     <string name="get_started">Get Started</string>
     <string name="pick_pictures_videos"><![CDATA[pick pictures & videos]]></string>
     <string name="censor_x_blur_faces_nin_picures_and_videos">CENSOR X - BLUR FACES</string>
-    <string name="censor_x_blur_faces_makes_it_fast_and_simple_n_to_anonymize_faces_in_your_photos_and_videos">Censor X - Blur Faces makes it fast and\nsimple to anonymize faces in your photos\n and videos.</string>
+    <string name="censor_x_blur_faces_makes_it_fast_and_simple_n_to_anonymize_faces_in_your_photos_and_videos">Censor X - Blur Faces makes it fast and simple\nto anonymize faces in your photos and videos.</string>
     <string name="none">None</string>
     <string name="top_blur">Top Blur</string>
     <string name="bottom_blur">Bottom Blur</string>
@@ -49,7 +49,6 @@
     <string name="please_allow">Please allow access to your photos library to pick pictures and videos that needs to be blurred out</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
-    <string name="_50">50%</string>
 
 
 </resources>

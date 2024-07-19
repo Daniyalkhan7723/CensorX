@@ -33,42 +33,42 @@ class BlurFiltersAdapter(
                 ivBlurType.setImageResource(data.image)
                 if (data.isSelected) {
                     if (position == 0) {
-//                        if (VideoEditActivity.topBlur || VideoEditActivity.bottomBlur || VideoEditActivity.fullBlur) {
-//                            cv.setCardBackgroundColor(
-//                                ContextCompat.getColor(
-//                                    context,
-//                                    R.color.selected_btn_color
-//                                )
-//                            )
-//                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
-//
-//                            if (position == list.size - 1) {
-//                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
-//                            } else {
-//                                ivBlurType.setColorFilter(
-//                                    ContextCompat.getColor(context, R.color.white),
-//                                    android.graphics.PorterDuff.Mode.SRC_IN
-//                                )
-//                            }
-//                        }
-//                        else {
-//                            cv.setCardBackgroundColor(
-//                                ContextCompat.getColor(
-//                                    context,
-//                                    R.color.selected_btn_color
-//                                )
-//                            )
-//                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
-//
-//                            if (position == list.size - 1) {
-//                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
-//                            } else {
-//                                ivBlurType.setColorFilter(
-//                                    ContextCompat.getColor(context, R.color.white),
-//                                    android.graphics.PorterDuff.Mode.SRC_IN
-//                                )
-//                            }
-//                        }
+                        if (VideoEditActivity.topBlur || VideoEditActivity.bottomBlur || VideoEditActivity.fullBlur) {
+                            cv.setCardBackgroundColor(
+                                ContextCompat.getColor(
+                                    context,
+                                    R.color.selected_btn_color
+                                )
+                            )
+                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
+
+                            if (position == list.size - 1) {
+                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
+                            } else {
+                                ivBlurType.setColorFilter(
+                                    ContextCompat.getColor(context, R.color.white),
+                                    android.graphics.PorterDuff.Mode.SRC_IN
+                                )
+                            }
+                        }
+                        else {
+                            cv.setCardBackgroundColor(
+                                ContextCompat.getColor(
+                                    context,
+                                    R.color.selected_btn_color
+                                )
+                            )
+                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
+
+                            if (position == list.size - 1) {
+                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
+                            } else {
+                                ivBlurType.setColorFilter(
+                                    ContextCompat.getColor(context, R.color.white),
+                                    android.graphics.PorterDuff.Mode.SRC_IN
+                                )
+                            }
+                        }
                     }
                     else {
                         cv.setCardBackgroundColor(
@@ -90,32 +90,32 @@ class BlurFiltersAdapter(
                     }
                 }
                 else {
-//                    if (position == 0) {
-//                        if (VideoEditActivity.topBlur || VideoEditActivity.bottomBlur || VideoEditActivity.fullBlur) {
-//                            defaultView(position)
-//
-//                        }
-//                        else {
-//                            cv.setCardBackgroundColor(
-//                                ContextCompat.getColor(
-//                                    context,
-//                                    R.color.selected_btn_color
-//                                )
-//                            )
-//                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
-//
-//                            if (position == list.size - 1) {
-//                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
-//                            } else {
-//                                ivBlurType.setColorFilter(
-//                                    ContextCompat.getColor(context, R.color.white),
-//                                    android.graphics.PorterDuff.Mode.SRC_IN
-//                                )
-//                            }
-//                        }
-//                    }else{
-//                        defaultView(position)
-//                    }
+                    if (position == 0) {
+                        if (VideoEditActivity.topBlur || VideoEditActivity.bottomBlur || VideoEditActivity.fullBlur) {
+                            defaultView(position)
+
+                        }
+                        else {
+                            cv.setCardBackgroundColor(
+                                ContextCompat.getColor(
+                                    context,
+                                    R.color.selected_btn_color
+                                )
+                            )
+                            tvBlurType.setTextColor(ContextCompat.getColor(context, R.color.white))
+
+                            if (position == list.size - 1) {
+                                ivBlurType.setImageResource(R.drawable.ic_full_blur_white)
+                            } else {
+                                ivBlurType.setColorFilter(
+                                    ContextCompat.getColor(context, R.color.white),
+                                    android.graphics.PorterDuff.Mode.SRC_IN
+                                )
+                            }
+                        }
+                    }else{
+                        defaultView(position)
+                    }
 
                 }
             }

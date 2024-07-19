@@ -5,5 +5,5 @@
         android:width="1.5dp"
         android:color="@color/white" />
     <corners android:radius="@dimen/_4sdp" />
-    <solid android:color="@color/app_bg_color" />
+    <solid android:color="@color/selected_btn_color" />
 </shape>

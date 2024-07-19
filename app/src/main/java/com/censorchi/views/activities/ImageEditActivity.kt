@@ -1,12 +1,12 @@
 package com.censorchi.views.activities
 
 import android.annotation.SuppressLint
-import android.app.Dialog
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.ColorDrawable
 import android.media.MediaScannerConnection
-import android.os.*
+import android.os.Build
+import android.os.Bundle
+import android.os.Environment
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
@@ -15,9 +15,10 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.view.WindowManager
 import android.view.animation.AnimationUtils
-import android.widget.*
+import android.widget.ImageView
+import android.widget.SeekBar
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +33,7 @@ import com.censorchi.utils.imageBlurUtils.ImageViewTouchAndDraw
 import com.censorchi.utils.imageBlurUtils.PinchImageView
 import com.censorchi.utils.imageBlurUtils.ResizeImage
 import com.censorchi.views.popUp.ExitDialogue
+import com.censorchi.views.popUp.MaterialDialogHelper
 import com.google.android.exoplayer2.util.NalUnitUtil
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -40,21 +42,22 @@ import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import cz.msebera.android.httpclient.conn.params.ConnPerRouteBean
 import cz.msebera.android.httpclient.impl.client.cache.CacheConfig
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlin.collections.ArrayList
 import kotlin.math.abs
-
 
 class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBarChangeListener {
     private lateinit var binding: ActivityImageEditBinding
     private var brushWidth = 50
-    private var blrValue = 70
+    private var colorized: Bitmap? = null
+    private var bitmap: Bitmap? = null
+    private var blrValue = 0
     private lateinit var detector: FaceDetector
     private var currentMode = 1
     private var imagePath: String? = null
@@ -64,43 +67,31 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
     private var mX = 0f
     private var mY = 0f
     private var myCombineCanvas: Canvas? = null
-
-    private lateinit var dialog: Dialog
-    private var progressbar: ProgressBar? = null
-    private var textView: TextView? = null
-
+    private var myCombinedBitmap: Bitmap? = null
     private var pcanvas: Canvas? = null
+    private var saveShareBitmap: Bitmap? = null
     private var screenHeight = 0
     private var screenWidth = 0
     private var tmpPath: Path? = null
-
-    /* Bitmaps */
     private var topImage: Bitmap? = null
-    private var saveShareBitmap: Bitmap? = null
-    private var colorized: Bitmap? = null
-    private var bitmap: Bitmap? = null
     private var newBitmap: Bitmap? = null
     private var checkBitmap: Bitmap? = null
-    private var myCombinedBitmap: Bitmap? = null
-
     private var currentShowingIndex = -1
     private lateinit var exitPopup: ExitDialogue
     private lateinit var bitmapsForUndo: ArrayList<Bitmap>
+    private lateinit var lastTenDataList: ArrayList<Bitmap>
     private lateinit var listForCheckActiveAutoBlur: ArrayList<String>
-
-    /*Booleans*/
+    private lateinit var listForCheckActiveAutoBlurLastTen: ArrayList<String>
     private var isZoomRequired = false
     private var brushSize = false
     private var isFirstTimeLaunch = false
-    private var unableTouchBlur = false
-    private var selectAndDeselectButtonCheck = false
-    private var autoBlurActive = false
-    private var checkVisibilty = false
-
+    private var unableTouchBlur: Boolean = false
+    private var selectAndDeselectButtonCheck: Boolean = false
+    private var autoBlurActive: Boolean = false
 
     companion object {
         @JvmField
-        var setScroll = false
+        var setScroll: Boolean = false
     }
 
     private fun getMatrixValues(m: Matrix): FloatArray {
@@ -113,17 +104,13 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ActivityImageEditBinding.inflate(layoutInflater).also { binding = it }
-//        fullScreenWithStatusBarWhiteIcon()
+        fullScreenWithStatusBarWhiteIcon()
         setContentView(binding.root)
         initValues()
         disableShareAndSave()
-        binding.btnReset.alpha = 0.5f
-        binding.btnReset.isEnabled = false
 
         if (topImage == null) {
-            Toast.makeText(
-                this@ImageEditActivity, getString(R.string.image_not_supported), Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this@ImageEditActivity, getString(R.string.image_not_supported), Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -134,6 +121,7 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         binding.blurSeekbar.setOnSeekBarChangeListener(this)
         binding.blurSeekbar.progress = 50
         binding.blurSeekbar.max = 100
+
         setDefaultLayoutForButtons()
         listeners()
         setButtonsVisibility()
@@ -142,12 +130,15 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
     /* Initialize Values */
     private fun initValues() {
         bitmapsForUndo = ArrayList()
+        lastTenDataList = ArrayList()
         listForCheckActiveAutoBlur = ArrayList()
+        listForCheckActiveAutoBlurLastTen = ArrayList()
         isZoomRequired = true
         val displayMetrics = DisplayMetrics()
         windowManager.defaultDisplay.getMetrics(displayMetrics)
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
+
         try {
             imagePath = intent.getStringExtra(IMAGE_PATH)
         } catch (e: java.lang.Exception) {
@@ -163,57 +154,47 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         detector = FaceDetection.getClient(realTimeFdo)
     }
 
+
     /* This method is used for detect faces from bitmap with ML kit
     * https://developers.google.com/ml-kit/guides
     * */
     private fun analyzePhoto(detectBitmap: Bitmap) {
-        val smallerBitmap = Bitmap.createScaledBitmap(
+         val smallerBitmap = Bitmap.createScaledBitmap(
             detectBitmap,
             detectBitmap.width / SCALING_FACTOR,
             detectBitmap.height / SCALING_FACTOR,
             false
         )
         val image = InputImage.fromBitmap(smallerBitmap, 0)
+
         detector.process(image).addOnSuccessListener {
-            if (it.isEmpty()) {
-                dialog.dismiss()
+             if (it.isEmpty()) {
                 autoBlurActive = true
                 Toast.makeText(this, getString(R.string.no_face_found), Toast.LENGTH_SHORT).show()
             } else {
+
                 if (newBitmap != null) {
                     newBitmap = createFinalImage()!!
                 }
 
-                lifecycleScope.launch {
-                    for (face in it) {
-                        val rect = face.boundingBox
-                        rect.set(
-                            rect.left * SCALING_FACTOR,
-                            rect.top * (SCALING_FACTOR - 1),
-                            rect.right * (SCALING_FACTOR),
-                            rect.bottom * SCALING_FACTOR + 90
-                        )
+                for (face in it) {
+                    val rect = face.boundingBox
+                    rect.set(
+                        rect.left * SCALING_FACTOR,
+                        rect.top * (SCALING_FACTOR - 1),
+                        rect.right * (SCALING_FACTOR),
+                        rect.bottom * SCALING_FACTOR + 90
+                    )
 
-                        if (it.size > 1) {
-                            if (newBitmap != null) {
-                                cropDetectFace(newBitmap!!, face, "moreFaces")
-                            } else {
-                                cropDetectFace(detectBitmap, face, "moreFaces")
-                            }
-                        } else {
-                            if (newBitmap != null) {
-                                cropDetectFace(newBitmap!!, face, "oneFace")
-                            } else {
-                                cropDetectFace(detectBitmap, face, "oneFace")
-                            }
-                        }
-
+                    if (newBitmap != null) {
+                        cropDetectFace(newBitmap!!, face)
+                    } else {
+                        cropDetectFace(detectBitmap, face)
                     }
                 }
 
                 if (newBitmap != null) {
                     bitmap = newBitmap
-                    dialog.dismiss()
                     binding.blurImage.setImageBitmapReset(newBitmap, true, null)
                     binding.blurImage1.setImageBitmapReset(newBitmap, true, null)
 
@@ -227,21 +208,18 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
                     addToUndoListTwo(newBitmap!!)
                     setButtonsVisibility()
                     enableShareAndSave()
-                    binding.btnReset.alpha = 1f
-                    binding.btnReset.isEnabled = true
-                    checkVisibilty = true
                     autoBlurActive = true
                     binding.buttonLayouts.buttonRemoveAudio.isEnabled = false
                 }
             }
         }.addOnFailureListener {
-            Toast.makeText(this, "Failed due to ${it.message}", Toast.LENGTH_SHORT).show()
+             Toast.makeText(this, "Failed due to ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
     /* This method is used for crop detect Faces */
-    private fun cropDetectFace(bitmap: Bitmap, faces: Face, type: String) {
-        val mBitmap = bitmap
+    private fun cropDetectFace(bitmap: Bitmap, faces: Face) {
+        var mBitmap = bitmap
         val rect = faces.boundingBox
         val x = rect.left.coerceAtLeast(0)
         val y = rect.top.coerceAtLeast(0)
@@ -260,27 +238,14 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         val c = Canvas(mutableBitmap)
         var map1: Bitmap? = null
         var map2: Bitmap? = null
-
-        if (type == "moreFaces") {
-            for (i in 0..1) {
-                map1 = if (map2 != null) {
-                    blurImage(map2, 25)
-                } else {
-                    blurImage(croppedBitmap, 25)
-                }
-                map2 = map1
+        for (i in 0..9) {
+            map1 = if (map2 != null) {
+                blurImage(map2, 25)
+            } else {
+                blurImage(croppedBitmap, 25)
             }
-        } else {
-            for (i in 0..9) {
-                map1 = if (map2 != null) {
-                    blurImage(map2, 25)
-                } else {
-                    blurImage(croppedBitmap, 25)
-                }
-                map2 = map1
-            }
+            map2 = map1
         }
-
         if (map1 != null) {
             c.drawBitmap(map1, rect.left.toFloat(), rect.top.toFloat(), null)
         }
@@ -320,7 +285,7 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         val w = bitmap.width
         val h = bitmap.height
         val pix = IntArray(w * h)
-        bitmap.getPixels(pix, 0, w, 0, 0, w, h)
+         bitmap.getPixels(pix, 0, w, 0, 0, w, h)
         val wm = w - 1
         val hm = h - 1
         val wh = w * h
@@ -465,7 +430,7 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
                 goutsum -= sir[1]
                 boutsum -= sir[2]
                 if (x == 0) {
-                    vMin[y] = (y + r1).coerceAtMost(hm) * w
+                    vMin[y] = Math.min(y + r1, hm) * w
                 }
                 val p = x + vMin[y]
                 sir[0] = r[p]
@@ -545,11 +510,11 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
             pcanvas!!.setMatrix(mInvertedMatrix)
             when (event.action) {
                 0 -> {
-                    touchStart(event.x, event.y)
+                     touchStart(event.x, event.y)
                 }
                 CacheConfig.DEFAULT_MAX_UPDATE_RETRIES -> touchUp()
                 ConnPerRouteBean.DEFAULT_MAX_CONNECTIONS_PER_ROUTE -> {
-                    touchMove(event.x, event.y)
+                     touchMove(event.x, event.y)
                 }
             }
 
@@ -565,12 +530,9 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
                 }
                 if (newBitmap != null) {
                     checkBitmap = createFinalImage()
-                }
+                 }
                 addToUndoList()
                 enableShareAndSave()
-                binding.btnReset.alpha = 1f
-                binding.btnReset.isEnabled = true
-                checkVisibilty = true
             }
             setButtonsVisibility()
             return true
@@ -679,8 +641,8 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
 
     /* This method is call when we touch on image  */
     private fun touchMove(x: Float, y: Float) {
-        val dx = abs(x - mX)
-        val dy = abs(y - mY)
+        val dx = Math.abs(x - mX)
+        val dy = Math.abs(y - mY)
         if (dx >= PinchImageView.MIN_SCALE || dy >= PinchImageView.MIN_SCALE) {
             tmpPath!!.quadTo(mX, mY, (mX + x) / 2.0f, (mY + y) / 2.0f)
             pcanvas!!.drawPath(tmpPath!!, mPaint!!)
@@ -776,7 +738,8 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         binding.buttonLayouts.tvAddDistortion.text = getString(R.string.brush)
         binding.buttonLayouts.ivRemoveAudio.setImageResource(R.drawable.ic_dot_unfilled)
         binding.buttonLayouts.ivRemoveAudio.setColorFilter(
-            ContextCompat.getColor(this, R.color.grey_color), PorterDuff.Mode.SRC_IN
+            ContextCompat.getColor(this, R.color.grey_color),
+            PorterDuff.Mode.SRC_IN
         )
         binding.buttonLayouts.ivAddDistortion.setImageResource(R.drawable.ic_brush)
 
@@ -804,59 +767,52 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
                     )
                 )
             }
+
         }
-        binding.homeToolbarId.ivBack.applyBoomEffect()
+        binding.homeToolbarId.ivBack.applyBoomEffect(true)
         binding.homeToolbarId.ivBack.setOnClickListener {
-            if (checkVisibilty) {
-                exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                    override fun onGoToHomeOk() {
-                        onBackPressedDispatcher.onBackPressed() //with this line
-                        exitPopup.dismiss()
-                    }
+            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
+                override fun onGoToHomeOk() {
+                    onBackPressedDispatcher.onBackPressed() //with this line
+                    exitPopup.dismiss()
+                }
 
-                    override fun onGoToHomeCancel() {
-                        exitPopup.dismiss()
-                    }
-                }, "back")
-                exitPopup.show(supportFragmentManager, "")
-                exitPopup.isCancelable = true
-            } else {
-                onBackPressedDispatcher.onBackPressed() //with this line
-            }
+                override fun onGoToHomeCancel() {
+                    exitPopup.dismiss()
+                }
+            }, "back")
+            exitPopup.show(supportFragmentManager, "")
+            exitPopup.isCancelable = true
+
+
         }
 
-        binding.homeToolbarId.ivDownload.applyBoomEffect()
+        binding.homeToolbarId.ivDownload.applyBoomEffect(true)
         binding.homeToolbarId.ivDownload.setOnClickListener {
             if (bitmap != null) saveImage(createFinalImage()!!) else saveImage(topImage!!)
         }
 
-        binding.homeToolbarId.ivShare.applyBoomEffect()
+        binding.homeToolbarId.ivShare.applyBoomEffect(true)
         binding.homeToolbarId.ivShare.setOnClickListener {
             if (bitmap != null) shareImageAndText(createFinalImage()!!) else shareImageAndText(
                 topImage!!
             )
         }
-        binding.buttonLayouts.buttonRemoveAudio.applyBoomEffect()
+        binding.buttonLayouts.buttonRemoveAudio.applyBoomEffect(true)
         binding.buttonLayouts.buttonRemoveAudio.setOnClickListener {
-            setProgressDialogue()
             selectAndDeselectButtonCheck = false
             unableTouchBlur = false
             binding.seekLay.visibility = View.INVISIBLE
             resetButtonItems()
             activeBlurButton()
-
-
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (bitmap != null) {
-                    analyzePhoto(createFinalImage()!!)
-                } else {
-                    analyzePhoto(topImage!!)
-                }
-            }, 100)
-
+            if (bitmap != null) {
+                analyzePhoto(createFinalImage()!!)
+            } else {
+                analyzePhoto(topImage!!)
+            }
         }
 
-        binding.buttonLayouts.buttonRemoveDistortion.applyBoomEffect()
+        binding.buttonLayouts.buttonRemoveDistortion.applyBoomEffect(true)
         binding.buttonLayouts.buttonRemoveDistortion.setOnClickListener {
             if (!selectAndDeselectButtonCheck) {
                 isZoomRequired = false
@@ -869,12 +825,12 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
                 if (bitmap != null) {
                     imageViewWidth = createFinalImage()!!.width
                     imageViewHeight = createFinalImage()!!.height
-                    colorized = fastBlur(createFinalImage()!!, blrValue)
+                    colorized = fastBlur(createFinalImage()!!, 70)
                     initFunction(createFinalImage()!!)
                 } else {
                     imageViewWidth = topImage!!.width
                     imageViewHeight = topImage!!.height
-                    colorized = fastBlur(topImage!!, blrValue)
+                    colorized = fastBlur(topImage!!, 70)
                     initFunction(topImage!!)
                 }
 
@@ -907,12 +863,12 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
             if (newBitmap != null) {
                 imageViewWidth = newBitmap!!.width
                 imageViewHeight = newBitmap!!.height
-                colorized = fastBlur(newBitmap!!, blrValue)
+                colorized = fastBlur(newBitmap!!, 70)
                 initFunction(newBitmap!!)
             } else {
                 imageViewWidth = topImage!!.width
                 imageViewHeight = topImage!!.height
-                colorized = fastBlur(topImage!!, blrValue)
+                colorized = fastBlur(topImage!!, 70)
                 initFunction(topImage!!)
             }
         }
@@ -921,9 +877,6 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
             val animation = AnimationUtils.loadAnimation(this, R.anim.fadein)
             binding.ivRedo.startAnimation(animation)
             enableShareAndSave()
-            binding.btnReset.alpha = 1f
-            binding.btnReset.isEnabled = true
-            checkVisibilty = true
             if (newBitmap != null) {
                 if (!newBitmap!!.isRecycled) {
                     newBitmap!!.recycle()
@@ -938,60 +891,22 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
             if (newBitmap != null) {
                 imageViewWidth = newBitmap!!.width
                 imageViewHeight = newBitmap!!.height
-                colorized = fastBlur(newBitmap!!, blrValue)
+                colorized = fastBlur(newBitmap!!, 70)
                 initFunction(newBitmap!!)
             } else {
                 imageViewWidth = topImage!!.width
                 imageViewHeight = topImage!!.height
-                colorized = fastBlur(topImage!!, blrValue)
+                colorized = fastBlur(topImage!!, 70)
                 initFunction(topImage!!)
             }
-        }
-
-        binding.btnReset.setOnClickListener {
-            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                override fun onGoToHomeOk() {
-                    binding.btnReset.applyBoomEffect()
-                    binding.btnReset.alpha = 0.5f
-                    binding.btnReset.isEnabled = false
-                    saveShareBitmap = null
-                    binding.buttonLayouts.buttonRemoveAudio.isEnabled = true
-                    colorized = null
-                    bitmap = null
-                    newBitmap = null
-                    checkBitmap = null
-                    myCombinedBitmap = null
-                    isZoomRequired = true
-                    unableTouchBlur = false
-                    selectAndDeselectButtonCheck = false
-                    binding.seekLay.inVisible()
-                    bitmapsForUndo.clear()
-                    listForCheckActiveAutoBlur.clear()
-                    currentShowingIndex = -1
-                    binding.blurSeekbar.progress = 50
-                    brushWidth = 50
-                    addToUndoList()
-                    setButtonsVisibility()
-                    resetButtonItems()
-                    disableShareAndSave()
-                    binding.blurImage.setImageBitmapReset(topImage, true, null)
-                    binding.blurImage1.setImageBitmapReset(topImage, true, null)
-                    exitPopup.dismiss()
-                }
-
-                override fun onGoToHomeCancel() {
-                    exitPopup.dismiss()
-                }
-            }, "reset")
-            exitPopup.show(supportFragmentManager, "")
-            exitPopup.isCancelable = true
         }
     }
 
     private fun activeBrushBlurButton() {
-        binding.buttonLayouts.buttonRemoveDistortion.background = ContextCompat.getDrawable(
-            this@ImageEditActivity, R.drawable.ss_corner_round_light_blue
-        )
+        binding.buttonLayouts.buttonRemoveDistortion.background =
+            ContextCompat.getDrawable(
+                this@ImageEditActivity, R.drawable.ss_corner_round_light_blue
+            )
         binding.buttonLayouts.ivAddDistortion.apply {
             setImageDrawable(
                 ContextCompat.getDrawable(
@@ -1015,6 +930,7 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         binding.buttonLayouts.buttonRemoveAudio.background = ContextCompat.getDrawable(
             this@ImageEditActivity, R.drawable.ss_corner_round_light_blue
         )
+
         binding.buttonLayouts.ivRemoveAudio.apply {
             setImageDrawable(
                 ContextCompat.getDrawable(
@@ -1039,9 +955,9 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
     private fun setButtonsVisibility() {
         if (currentShowingIndex > 0) {
             binding.ivUndo.setImageResource(R.drawable.ic_undo_filled)
-            binding.ivUndo.isEnabled = true
+             binding.ivUndo.isEnabled = true
         } else {
-            binding.ivUndo.setImageResource(R.drawable.ic_undo)
+             binding.ivUndo.setImageResource(R.drawable.ic_undo)
             binding.ivUndo.isEnabled = false
         }
 
@@ -1195,8 +1111,6 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         if (currentShowingIndex == 0) {
             binding.buttonLayouts.buttonRemoveAudio.isEnabled = true
             disableShareAndSave()
-//            binding.btnReset.alpha = 0.5f
-//            binding.btnReset.isEnabled = false
             if (autoBlurActive) resetAutoBlurButton()
         }
 
@@ -1228,7 +1142,8 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         }
 
         return bitmapsForUndo[currentShowingIndex].copy(
-            bitmapsForUndo[currentShowingIndex].config, true
+            bitmapsForUndo[currentShowingIndex].config,
+            true
         )
     }
 
@@ -1246,21 +1161,17 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
     }
 
     private fun enableShareAndSave() {
-        binding.homeToolbarId.apply {
-            ivDownload.isEnabled = true
-            ivDownload.alpha = 1f
-            ivShare.isEnabled = true
-            ivShare.alpha = 1f
-        }
+        binding.homeToolbarId.ivDownload.isEnabled = true
+        binding.homeToolbarId.ivDownload.alpha = 1f
+        binding.homeToolbarId.ivShare.isEnabled = true
+        binding.homeToolbarId.ivShare.alpha = 1f
     }
 
     private fun disableShareAndSave() {
-        binding.homeToolbarId.apply {
-            ivDownload.isEnabled = false
-            ivDownload.alpha = 0.5f
-            ivShare.isEnabled = false
-            ivShare.alpha = 0.5f
-        }
+        binding.homeToolbarId.ivDownload.isEnabled = false
+        binding.homeToolbarId.ivDownload.alpha = 0.5f
+        binding.homeToolbarId.ivShare.isEnabled = false
+        binding.homeToolbarId.ivShare.alpha = 0.5f
     }
 
     /* This function is used for save final image*/
@@ -1283,9 +1194,10 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         }
         try {
             val f = File(
-                imageDirectory, CENSOR_X + Calendar.getInstance().timeInMillis.toString() + ".jpg"
+                imageDirectory,
+                CENSOR_X + Calendar.getInstance().timeInMillis.toString() + ".jpg"
             )
-            if (!f.parentFile!!.exists()) f.parentFile?.mkdirs()
+            if (!f.parentFile.exists()) f.parentFile?.mkdirs()
             if (!f.exists()) f.createNewFile()
             val fo = FileOutputStream(f)
             fo.write(bytes.toByteArray())
@@ -1294,7 +1206,16 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
             )
 
             fo.close()
-            setSaveDialogue()
+            val popup = MaterialDialogHelper("ImageSave")
+            popup.show(supportFragmentManager, "")
+            popup.isCancelable = true
+            lifecycleScope.launch {
+                delay(2000)
+                popup.dismiss()
+            }
+
+            disableShareAndSave()
+
             return f.absolutePath
         } catch (e1: IOException) {
             e1.printStackTrace()
@@ -1302,63 +1223,18 @@ class ImageEditActivity : BaseActivity(), View.OnTouchListener, SeekBar.OnSeekBa
         return ""
     }
 
-    /* Set the save dialogue */
-    private fun setSaveDialogue() {
-        val dialog = Dialog(this@ImageEditActivity)
-        dialog.apply {
-            checkVisibilty = false
-            setContentView(R.layout.custom_progressbar)
-            val progress = findViewById<ProgressBar>(R.id.progressBar)
-            val textView = findViewById<TextView>(R.id.tv)
-            val ivDone = findViewById<ImageView>(R.id.iv_done)
-            val mHandler = Handler(Looper.getMainLooper())
-            window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setCancelable(true)
-            progress.viewGone()
-            ivDone.viewVisible()
-            textView.text = "Image Saved"
-            show()
-
-            mHandler.postDelayed({
-                cancel()
-            }, 4000)
-        }
-    }
-
     override fun onBackPressed() {
-        if (checkVisibilty) {
-            exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
-                override fun onGoToHomeOk() {
-                    onBackPressedDispatcher.onBackPressed() //with this line
-                    exitPopup.dismiss()
-                }
+        exitPopup = ExitDialogue(object : ExitDialogue.GoToHome {
+            override fun onGoToHomeOk() {
+                onBackPressedDispatcher.onBackPressed() //with this line
+                exitPopup.dismiss()
+            }
 
-                override fun onGoToHomeCancel() {
-                    exitPopup.dismiss()
-                }
-            }, "back")
-            exitPopup.show(supportFragmentManager, "")
-            exitPopup.isCancelable = true
-        } else {
-            onBackPressedDispatcher.onBackPressed()
-        }
+            override fun onGoToHomeCancel() {
+                exitPopup.dismiss()
+            }
+        }, "back")
+        exitPopup.show(supportFragmentManager, "")
+        exitPopup.isCancelable = true
     }
-
-    private fun setProgressDialogue() {
-        dialog = Dialog(this@ImageEditActivity)
-        dialog.apply {
-            setContentView(R.layout.custom_progress_for_image)
-            progressbar = findViewById(R.id.progressBar)
-            Handler(Looper.getMainLooper()).postDelayed({
-                progressbar?.progress=90
-            }, 100)
-
-            textView = findViewById(R.id.tv)
-            window!!.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window!!.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setCancelable(false)
-            show()
-        }
-    }
-
 }

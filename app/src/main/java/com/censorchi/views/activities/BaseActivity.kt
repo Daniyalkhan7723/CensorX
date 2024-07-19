@@ -5,7 +5,6 @@ import android.content.Intent
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -27,7 +26,6 @@ import com.censorchi.utils.sharedPreference.AppStorage
 import com.censorchi.BuildConfig
 import com.censorchi.utils.Constants.PERMISSION_REQUEST_CODE
 import java.io.*
-import java.util.concurrent.TimeUnit
 
 open class BaseActivity : AppCompatActivity() {
     private lateinit var afterPermissionFunc: (Map<String, Int>) -> Unit
@@ -259,45 +257,6 @@ open class BaseActivity : AppCompatActivity() {
                 "Finished scanning $path1"
             )
         }
-    }
-
-      fun isVideoHaveAudioTrack(path: String): Boolean {
-        var audioTrack = false
-        val retriever = MediaMetadataRetriever()
-        retriever.setDataSource(path)
-        val hasAudioStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
-        audioTrack = if (hasAudioStr != null && hasAudioStr == "yes") {
-            true
-        } else {
-            false
-        }
-        return audioTrack
-    }
-
-    /* This function is call for calculate remaining time */
-    fun calculateTimeLeft(timeLeft: Long): String {
-        return String.format(
-            "%d:%02d",
-            TimeUnit.MILLISECONDS.toMinutes(timeLeft) % TimeUnit.HOURS.toMinutes(1),
-            TimeUnit.MILLISECONDS.toSeconds(timeLeft) % TimeUnit.MINUTES.toSeconds(1)
-        )
-    }
-
-    fun setShare(path: String) {
-        val uri = FileProvider.getUriForFile(
-            this@BaseActivity, "$packageName.provider", File(path)
-        )
-        val sharingIntent = Intent(Intent.ACTION_SEND)
-        sharingIntent.apply {
-            type = "video/*"
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "Create By : Censor X \n\n https://play.google.com/store/apps/details?id=$packageName"
-            )
-            putExtra(Intent.EXTRA_STREAM, uri)
-        }
-        startActivity(Intent.createChooser(sharingIntent, "Share Video"))
-
     }
 
 }

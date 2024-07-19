@@ -20,11 +20,10 @@ class GetStartedActivity : BaseActivity() {
         binding = ActivityGetStartedBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setStatusBar()
-        binding.btnGetStarted.apply {
-            applyBoomEffect()
-            setOnClickListener {
-                startActivity(Intent(this@GetStartedActivity, AllowAccessActivity::class.java))
-            }
+
+        binding.btnGetStarted.applyBoomEffect(true)
+        binding.btnGetStarted.setOnClickListener {
+            startActivity(Intent(this@GetStartedActivity, AllowAccessActivity::class.java))
         }
     }
 
